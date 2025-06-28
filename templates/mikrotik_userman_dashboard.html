@@ -500,6 +500,25 @@
              min-height: 300px; 
              transition: background-color 0.3s ease;
         }
+        .system-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.75rem; /* Smaller gap for denser info */
+            font-size: 0.9rem;
+        }
+        .system-info-grid div {
+            background-color: var(--theme-bg-main); /* Match main background */
+            padding: 0.75rem 1rem;
+            border-radius: var(--border-radius);
+            border: 1px solid var(--theme-border-light);
+        }
+        .system-info-grid strong {
+            color: var(--theme-text-primary);
+        }
+        .system-info-grid span {
+            color: var(--theme-text-secondary);
+            word-break: break-all; /* Prevent long strings from breaking layout */
+        }
 
         .analytics-grid {
             display: grid;
@@ -645,6 +664,34 @@
                     <div class="stat-card-info">
                         <h3 id="activeSessions">-</h3>
                         <p>Active Sessions</p>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <i class="fas fa-pie-chart stat-card-icon" style="color: var(--info-color);"></i>
+                    <div class="stat-card-info">
+                        <h3 id="profilesCount">-</h3>
+                        <p>User Profiles</p>
+                    </div>
+                </div>
+            </div>
+            <div class="panel">
+                <h3 class="panel-header"><i class="fas fa-server" style="margin-right: 8px;"></i>System Information</h3>
+                <div class="system-info-grid">
+                    <div><strong>Router Uptime:</strong> <span id="routerUptime">-</span></div>
+                    <div><strong>OS Version:</strong> <span id="routerOsVersion">-</span></div>
+                    <div><strong>CPU Load:</strong> <span id="routerCpuLoad">-</span>%</div>
+                    <div><strong>Memory Usage:</strong> <span id="routerMemoryUsage">-</span></div>
+                    <div><strong>Model & Firmware:</strong> <span id="routerModelFirmware">-</span></div>
+                </div>
+            </div>
+            <div class="panel">
+                <h3 class="panel-header"><i class="fas fa-chart-pie" style="margin-right: 8px;"></i>User Profile Distribution</h3>
+                <div class="chart-container" style="height: 300px;">
+                    <canvas id="userProfileDistributionChart"></canvas>
+                    <div id="userProfileDistributionChartEmptyState" class="empty-state-container" style="display: none; position: absolute; top: 0; left: 0; min-height: 250px;">
+                        <div class="empty-state-icon"><i class="fas fa-users"></i></div>
+                        <h5 class="empty-state-title">No Profile Data</h5>
+                        <p class="empty-state-text">No user profile distribution data to display currently.</p>
                     </div>
                 </div>
             </div>
@@ -948,6 +995,7 @@ let cachedTranslations = {}; // For storing fetched translations
 // Chart instances
 let profileUsageChartInstance;
 let topUsersChartInstance;
+let userProfileDistributionChartInstance; // Added for the new chart
 
 // Helper function to get translations
 function getTranslation(key, ...args) {
@@ -1184,6 +1232,7 @@ async function init() {
 
     await checkConnection();
     await loadDashboardStats();
+    await loadSystemInformation(); // Load system info on init
     await loadUsers();
     await loadProfiles(); // This will now use getTranslation for default options
     await loadActiveSessions();
@@ -1193,7 +1242,8 @@ async function init() {
     // Auto-refresh data every 60 seconds
     setInterval(() => {
         if (document.getElementById('dashboard').classList.contains('active')) {
-             loadDashboardStats();
+             loadDashboardStats(); // This will also call renderUserProfileDistributionChart
+             loadSystemInformation(); // Refresh system info
         }
         if (document.getElementById('users').classList.contains('active')) {
              loadUsers(true); // silent refresh
@@ -1202,6 +1252,24 @@ async function init() {
              loadActiveSessions();
         }
     }, 60000);
+}
+
+async function loadSystemInformation() {
+    const data = await apiCall('/system-information');
+    if (data) {
+        document.getElementById('routerUptime').textContent = data.uptime || '-';
+        document.getElementById('routerOsVersion').textContent = data.os_version || '-';
+        document.getElementById('routerCpuLoad').textContent = data.cpu_load || '-';
+        document.getElementById('routerMemoryUsage').textContent = data.memory_usage || '-';
+        document.getElementById('routerModelFirmware').textContent = data.model_firmware || '-';
+    } else {
+        // Reset to defaults if API call fails or returns no data
+        document.getElementById('routerUptime').textContent = '-';
+        document.getElementById('routerOsVersion').textContent = '-';
+        document.getElementById('routerCpuLoad').textContent = '-';
+        document.getElementById('routerMemoryUsage').textContent = '-';
+        document.getElementById('routerModelFirmware').textContent = '-';
+    }
 }
 
 // --- API & Data Loading ---
@@ -1408,13 +1476,116 @@ async function loadDashboardStats() {
     if (data) { // apiCall returns null on connection error to Mikrotik via service layer
         document.getElementById('totalUsers').textContent = data.total_users !== undefined ? data.total_users : '-';
         document.getElementById('activeSessions').textContent = data.active_sessions !== undefined ? data.active_sessions : '-';
+        document.getElementById('profilesCount').textContent = data.profiles_count !== undefined ? data.profiles_count : '-'; // Update profiles count
+
+        // Assuming users data is part of dashboard-stats or fetched separately and available here
+        // For now, let's assume `data.users_for_profile_chart` is available.
+        // This will be adjusted if user data needs to be fetched/passed differently.
+        if (data.users_for_profile_chart) {
+            renderUserProfileDistributionChart(data.users_for_profile_chart);
+        }
+
     } else {
         // If data is null (likely Mikrotik connection issue), ensure UI reflects this
         document.getElementById('totalUsers').textContent = '-';
         document.getElementById('activeSessions').textContent = '-';
+        document.getElementById('profilesCount').textContent = '-'; // Reset profiles count
+        renderUserProfileDistributionChart([]); // Render with empty data to show empty state
         // A more specific message might be set by checkConnection's UI update
     }
 }
+
+
+function renderUserProfileDistributionChart(users) {
+    const ctx = document.getElementById('userProfileDistributionChart').getContext('2d');
+    const emptyStateDiv = document.getElementById('userProfileDistributionChartEmptyState');
+
+    if (userProfileDistributionChartInstance) {
+        userProfileDistributionChartInstance.destroy();
+    }
+
+    if (!users || users.length === 0) {
+        if (emptyStateDiv) emptyStateDiv.style.display = 'flex';
+        // Ensure canvas is hidden or cleared if it was previously drawn
+        if (ctx && ctx.canvas) ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        return;
+    }
+
+    if (emptyStateDiv) emptyStateDiv.style.display = 'none';
+
+    const profileCounts = users.reduce((acc, user) => {
+        const profile = user.profile || 'N/A'; // Group users without a profile as 'N/A'
+        acc[profile] = (acc[profile] || 0) + 1;
+        return acc;
+    }, {});
+
+    const labels = Object.keys(profileCounts);
+    const data = Object.values(profileCounts);
+    const totalUsersInChart = data.reduce((sum, val) => sum + val, 0);
+
+
+    // Define colors - can be expanded or dynamically generated
+    const chartColors = [
+        '#3498db', '#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6',
+        '#1abc9c', '#e67e22', '#34495e', '#7f8c8d', '#16a085'
+    ];
+
+    const isDarkMode = document.body.classList.contains('dark-mode');
+    const labelColor = isDarkMode ? getComputedStyle(document.documentElement).getPropertyValue('--theme-text-secondary').trim() : getComputedStyle(document.documentElement).getPropertyValue('--theme-text-primary').trim();
+    const tooltipBgColor = isDarkMode ? '#2c3e50' : '#fff';
+    const tooltipTitleColor = isDarkMode ? '#ecf0f1' : '#2c3e50';
+    const tooltipBodyColor = isDarkMode ? '#ecf0f1' : '#2c3e50';
+
+    userProfileDistributionChartInstance = new Chart(ctx, {
+        type: 'doughnut', // Doughnut chart for a slightly more modern look
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'User Profile Distribution',
+                data: data,
+                backgroundColor: chartColors.slice(0, labels.length), // Use enough colors for profiles
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                animateScale: true,
+                animateRotate: true
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom', // Better for dashboard space
+                    labels: {
+                        color: labelColor,
+                        padding: 15 // Add some padding to legend items
+                    }
+                },
+                tooltip: {
+                    backgroundColor: tooltipBgColor,
+                    titleColor: tooltipTitleColor,
+                    bodyColor: tooltipBodyColor,
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const percentage = totalUsersInChart > 0 ? ((value / totalUsersInChart) * 100).toFixed(1) : 0;
+                            return `${label}: ${value} users (${percentage}%)`;
+                        }
+                    }
+                },
+                title: { // Optional: Add a title if the panel header isn't sufficient
+                    display: false, // Set to true to show chart title
+                    text: 'User Profile Distribution',
+                    color: labelColor,
+                    font: { size: 14 }
+                }
+            }
+        }
+    });
+}
+
 
 async function loadUsers(silent = false) {
     const tbody = document.querySelector('#usersTable tbody');
@@ -2225,16 +2396,17 @@ async function loadAnalyticsData() {
 
 // Listen for theme changes to update chart options and re-render
 document.addEventListener('themeChanged', function(e) {
-    if (analyticsDataLoaded && document.getElementById('analytics').classList.contains('active')) {
-        const isDark = document.body.classList.contains('dark-mode');
-        const newGridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
-        const newLabelColor = isDark ? 
-            getComputedStyle(document.documentElement).getPropertyValue('--theme-text-secondary').trim() : 
-            getComputedStyle(document.documentElement).getPropertyValue('--theme-text-primary').trim();
-        const newTooltipBgColor = isDark ? '#2c3e50' : '#fff';
-        const newTooltipTitleColor = isDark ? '#ecf0f1' : '#2c3e50';
-        const newTooltipBodyColor = isDark ? '#ecf0f1' : '#2c3e50';
+    const isDark = document.body.classList.contains('dark-mode');
+    const newGridColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    const newLabelColor = isDark ?
+        getComputedStyle(document.documentElement).getPropertyValue('--theme-text-secondary').trim() :
+        getComputedStyle(document.documentElement).getPropertyValue('--theme-text-primary').trim();
+    const newTooltipBgColor = isDark ? '#2c3e50' : '#fff';
+    const newTooltipTitleColor = isDark ? '#ecf0f1' : '#2c3e50';
+    const newTooltipBodyColor = isDark ? '#ecf0f1' : '#2c3e50';
 
+    // Update Analytics Tab Charts (if loaded and active)
+    if (analyticsDataLoaded && document.getElementById('analytics').classList.contains('active')) {
         if (profileUsageChartInstance) {
             profileUsageChartInstance.options.plugins.legend.labels.color = newLabelColor;
             profileUsageChartInstance.options.plugins.tooltip.backgroundColor = newTooltipBgColor;
@@ -2252,6 +2424,18 @@ document.addEventListener('themeChanged', function(e) {
             topUsersChartInstance.options.plugins.tooltip.bodyColor = newTooltipBodyColor;
             topUsersChartInstance.update();
         }
+    }
+
+    // Update Dashboard Tab Profile Distribution Chart (if it exists)
+    if (userProfileDistributionChartInstance) {
+        userProfileDistributionChartInstance.options.plugins.legend.labels.color = newLabelColor;
+        userProfileDistributionChartInstance.options.plugins.tooltip.backgroundColor = newTooltipBgColor;
+        userProfileDistributionChartInstance.options.plugins.tooltip.titleColor = newTooltipTitleColor;
+        userProfileDistributionChartInstance.options.plugins.tooltip.bodyColor = newTooltipBodyColor;
+        // For doughnut chart, primary color might be used for segments if not specified,
+        // or if you want to update segment colors based on theme, do it here.
+        // Example: userProfileDistributionChartInstance.data.datasets[0].backgroundColor = [newColor1, newColor2, ...];
+        userProfileDistributionChartInstance.update();
     }
 });
 

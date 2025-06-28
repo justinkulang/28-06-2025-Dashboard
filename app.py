@@ -963,6 +963,68 @@ class RouterOSService:
             'data_usage_by_profile': data_by_profile
         }
 
+    def get_system_information(self) -> dict:
+        """Fetches various system information details from the router."""
+        api = get_mikrotik_api()
+        if api is None:
+            logger.error("Error getting system info: Mikrotik API not available.")
+            return {} # Return empty dict if no API
+
+        system_info = {}
+        try:
+            # Fetch resources: uptime, version, cpu-load, free-memory, total-memory
+            resource_data = list(api.path('system', 'resource').select(
+                'uptime', 'version', 'cpu-load', 'free-memory', 'total-memory'
+            ).get()) # Using .get() as there should only be one resource entry
+
+            if resource_data:
+                resource = resource_data[0]
+                system_info['uptime'] = resource.get('uptime', 'N/A')
+                system_info['os_version'] = resource.get('version', 'N/A')
+                system_info['cpu_load'] = resource.get('cpu-load', 'N/A')
+
+                free_mem = resource.get('free-memory', 0)
+                total_mem = resource.get('total-memory', 0)
+                if total_mem > 0: # Avoid division by zero
+                    used_mem = total_mem - free_mem
+                    system_info['memory_usage'] = f"{used_mem / (1024*1024):.1f}MB / {total_mem / (1024*1024):.1f}MB"
+                    system_info['memory_percentage'] = int((used_mem / total_mem) * 100) if total_mem else 0
+                else:
+                    system_info['memory_usage'] = "N/A"
+                    system_info['memory_percentage'] = 0
+            else:
+                logger.warning("Could not fetch system resource data.")
+
+            # Fetch routerboard info: model, current-firmware (or firmware for older RouterOS)
+            routerboard_data = list(api.path('system', 'routerboard').select(
+                'model', 'current-firmware', 'firmware' # 'firmware' for older versions
+            ).get())
+
+            if routerboard_data:
+                routerboard = routerboard_data[0]
+                system_info['model'] = routerboard.get('model', 'N/A')
+                # Prefer 'current-firmware', fallback to 'firmware'
+                firmware = routerboard.get('current-firmware') or routerboard.get('firmware')
+                system_info['firmware_version'] = firmware if firmware else 'N/A'
+                system_info['model_firmware'] = f"{system_info['model']} (FW: {system_info['firmware_version']})"
+
+            else:
+                logger.warning("Could not fetch routerboard data.")
+                system_info['model_firmware'] = "N/A"
+
+
+        except (TrapError, Exception) as e:
+            logger.error(f"Error fetching system information: {str(e)}")
+            # Populate with N/A if error occurs mid-fetch
+            system_info.setdefault('uptime', 'N/A')
+            system_info.setdefault('os_version', 'N/A')
+            system_info.setdefault('cpu_load', 'N/A')
+            system_info.setdefault('memory_usage', 'N/A')
+            system_info.setdefault('memory_percentage', 0)
+            system_info.setdefault('model_firmware', 'N/A')
+
+        return system_info
+
     def delete_users_by_profile(self, profile_name: str) -> tuple[bool, str, int]:
         """Deletes hotspot users belonging to a specific profile."""
         api = get_mikrotik_api()
@@ -1235,9 +1297,19 @@ def update_config_route():
 def get_dashboard_stats():
     users = router_os_service.get_hotspot_users()
     sessions = router_os_service.get_active_sessions()
+    profiles = router_os_service.get_user_profiles() # Get profiles to count them
+
     total_users = len(users)
     active_sessions = len(sessions)
-    return jsonify({'total_users': total_users, 'active_sessions': active_sessions})
+    profiles_count = len(profiles) # Count of defined profiles
+
+    # Pass the full user list for the frontend to calculate profile distribution
+    return jsonify({
+        'total_users': total_users,
+        'active_sessions': active_sessions,
+        'profiles_count': profiles_count,
+        'users_for_profile_chart': users # Send all users
+    })
 
 @app.route('/api/users', methods=['GET'])
 @login_required
@@ -1623,6 +1695,20 @@ def get_translations():
 
     }
     return jsonify(translations)
+
+@app.route('/api/system-information', methods=['GET'])
+@login_required
+def get_system_information_route():
+    logger.debug("API endpoint /api/system-information called.")
+    system_info = router_os_service.get_system_information()
+    if not system_info: # If API was down or data couldn't be fetched
+        # Return a specific structure indicating data is unavailable
+        return jsonify({
+            'uptime': 'N/A', 'os_version': 'N/A', 'cpu_load': 'N/A',
+            'memory_usage': 'N/A', 'memory_percentage': 0, 'model_firmware': 'N/A',
+            'error': 'Could not retrieve system information from router.'
+        }), 503 # Service Unavailable or custom error code
+    return jsonify(system_info)
 
 if __name__ == '__main__':
     server_config = app_config['server']
