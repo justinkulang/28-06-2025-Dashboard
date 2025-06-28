@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Hotspot Manager v2</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <style>
@@ -95,13 +97,14 @@
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        /* Let Bootstrap handle body background and color via data-bs-theme */
         body {
             font-family: var(--font-family);
-            background-color: var(--theme-bg-main); 
-            color: var(--theme-text-primary);
+            /* background-color: var(--theme-bg-main);  Removed */
+            /* color: var(--theme-text-primary); Removed */
             display: flex;
             height: 100vh;
-            transition: background-color 0.3s ease, color 0.3s ease; 
+            transition: background-color 0.3s ease, color 0.3s ease; /* Transitions will still work with BS vars */
         }
         .sidebar {
             width: 260px;
@@ -503,7 +506,8 @@
 
         .analytics-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            /* grid-template-columns: 1fr 1fr; */ /* Replaced for better responsiveness */
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 2rem;
             margin-top: 1.5rem;
         }
@@ -593,45 +597,56 @@
     </style>
 </head>
 <body>
-    <aside class="sidebar">
-        <div class="sidebar-header">
-            <img src="{{ url_for('static', filename='images/The IT Dad new logo.png') }}" alt="The IT Dad Logo" class="logo-image">
-        </div>
-        <ul class="sidebar-nav">
-            <li><a href="#" class="nav-link active" data-tab="dashboard"><i class="fas fa-tachometer-alt"></i><span>Dashboard</span></a></li>
-            <li><a href="#" class="nav-link" data-tab="users"><i class="fas fa-users"></i><span>Users</span></a></li>
-            <li><a href="#" class="nav-link" data-tab="create"><i class="fas fa-user-plus"></i><span>Create</span></a></li>
-            <li><a href="#" class="nav-link" data-tab="sessions"><i class="fas fa-wifi"></i><span>Active Sessions</span></a></li>
-            <li><a href="#" class="nav-link" data-tab="analytics"><i class="fas fa-chart-line"></i><span>Analytics</span></a></li>
-            <li><a href="#" class="nav-link" data-tab="maintenance"><i class="fas fa-tools"></i><span>Maintenance</span></a></li>
-            <li><a href="#" class="nav-link" data-tab="settings"><i class="fas fa-cog"></i><span>Settings</span></a></li>
-            <li><a href="#" id="logoutButton" class="nav-link"><i class="fas fa-sign-out-alt"></i><span>Logout</span></a></li>
-        </ul>
-        <div class="sidebar-footer">
-            <p><strong>The IT Dad</strong></p>
-            <p><i class="fas fa-phone-alt" style="margin-right: 5px; color: var(--primary-color);"></i>+(211) 923 616 820</p>
-            <p style="margin-bottom: 1rem;"><i class="fas fa-envelope" style="margin-right: 5px; color: var(--primary-color);"></i><a href="mailto:justinkulang@gmail.com" style="color: var(--primary-color); text-decoration: none;">justinkulang@gmail.com</a></p>
-            
-            <div class="theme-switch-wrapper">
-                <label class="theme-switch" for="themeToggleCheckbox" aria-label="Toggle dark mode">
-                    <input type="checkbox" id="themeToggleCheckbox" />
-                    <span class="slider round"></span>
-                </label>
-                <span style="margin-left: 0.75rem;" id="themeToggleLabel">Light Mode</span>
-            </div>
-        </div>
-    </aside>
-    <main class="main-content">
-        <div class="page-header">
-            <div>
-                <h1 id="pageTitle">Dashboard</h1>
-                <span>Mikrotik Hotspot Management</span>
-            </div>
-            <div id="connectionStatus" class="disconnected"><i class="fas fa-exclamation-triangle"></i><span>Connecting...</span></div>
-        </div>
-        <div id="globalAlert" class="alert" role="alert"></div>
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <nav id="sidebar" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse show">
+            <div class="position-sticky pt-3">
+                <div class="sidebar-header text-center mb-3">
+                    <img src="{{ url_for('static', filename='images/The IT Dad new logo.png') }}" alt="The IT Dad Logo" class="img-fluid" style="max-width: 120px;">
+                </div>
+                <ul class="nav flex-column">
+                    <li class="nav-item"><a href="#" class="nav-link active" data-tab="dashboard"><i class="fas fa-tachometer-alt me-2"></i><span>Dashboard</span></a></li>
+                    <li class="nav-item"><a href="#" class="nav-link" data-tab="users"><i class="fas fa-users me-2"></i><span>Users</span></a></li>
+                    <li class="nav-item"><a href="#" class="nav-link" data-tab="create"><i class="fas fa-user-plus me-2"></i><span>Create</span></a></li>
+                    <li class="nav-item"><a href="#" class="nav-link" data-tab="sessions"><i class="fas fa-wifi me-2"></i><span>Active Sessions</span></a></li>
+                    <li class="nav-item"><a href="#" class="nav-link" data-tab="analytics"><i class="fas fa-chart-line me-2"></i><span>Live Analytics</span></a></li>
+                    <li class="nav-item"><a href="#" class="nav-link" data-tab="historical-analytics"><i class="fas fa-history me-2"></i><span>Historical Analytics</span></a></li>
+                    <li class="nav-item"><a href="#" class="nav-link" data-tab="maintenance"><i class="fas fa-tools me-2"></i><span>Maintenance</span></a></li>
+                    <li class="nav-item"><a href="#" class="nav-link" data-tab="settings"><i class="fas fa-cog me-2"></i><span>Settings</span></a></li>
+                    <li class="nav-item"><a href="#" id="logoutButton" class="nav-link"><i class="fas fa-sign-out-alt me-2"></i><span>Logout</span></a></li>
+                </ul>
 
-        <div id="dashboard" class="tab-content active" role="tabpanel" aria-labelledby="tab-dashboard">
+                <div class="sidebar-footer mt-auto py-3 text-center">
+                    <p class="mb-1"><strong>The IT Dad</strong></p>
+                    <p class="mb-1 small"><i class="fas fa-phone-alt text-primary me-1"></i>+(211) 923 616 820</p>
+                    <p class="mb-2 small"><i class="fas fa-envelope text-primary me-1"></i><a href="mailto:justinkulang@gmail.com" class="text-decoration-none">justinkulang@gmail.com</a></p>
+
+                    <div class="theme-switch-wrapper d-flex align-items-center justify-content-center border-top pt-3 mt-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="themeToggleCheckbox">
+                            <label class="form-check-label small" for="themeToggleCheckbox" id="themeToggleLabel">Light Mode</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Main content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 main-content">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom page-header">
+                <button class="btn btn-link d-md-none p-0 me-3" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar" aria-controls="sidebar" aria-expanded="false" aria-label="Toggle navigation">
+                    <i class="fas fa-bars fa-lg"></i>
+                </button>
+                <div class="flex-grow-1">
+                    <h1 class="h2" id="pageTitle">Dashboard</h1>
+                    <span class="text-muted">Mikrotik Hotspot Management</span>
+                </div>
+                <div id="connectionStatus" class="badge text-bg-danger disconnected"><i class="fas fa-exclamation-triangle me-1"></i><span>Connecting...</span></div>
+            </div>
+            <div id="globalAlert" class="alert" role="alert" style="display: none;"></div>
+
+            <div id="dashboard" class="tab-content active" role="tabpanel" aria-labelledby="tab-dashboard">
             <div class="dashboard-grid">
                 <div class="stat-card">
                     <i class="fas fa-users stat-card-icon"></i>
@@ -655,27 +670,27 @@
 
         <div id="users" class="tab-content" role="tabpanel" aria-labelledby="tab-users">
             <div class="panel">
-                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="panel-header d-flex justify-content-between align-items-center">
                     <h3>User List</h3>
                     <button class="btn btn-primary btn-sm" onclick="loadUsers()"><i class="fas fa-sync-alt"></i> Refresh</button>
                 </div>
-                <div class="form-grid" style="margin-bottom: 1.5rem;">
-                    <div class="form-group"><input type="text" id="userSearchInput" placeholder="Search Username/Comment..."></div>
-                    <div class="form-group">
-                        <select id="userFilterProfile">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4"><input type="text" id="userSearchInput" class="form-control" placeholder="Search Username/Comment..."></div>
+                    <div class="col-md-4">
+                        <select id="userFilterProfile" class="form-select">
                             <option value="">Filter by Profile...</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <select id="userFilterStatus">
+                    <div class="col-md-4">
+                        <select id="userFilterStatus" class="form-select">
                             <option value="">Filter by Status...</option>
                             <option value="active">Active</option>
                             <option value="disabled">Disabled</option>
                         </select>
                     </div>
                 </div>
-                <div class="table-container">
-                    <table id="usersTable">
+                <div class="table-responsive">
+                    <table id="usersTable" class="table table-striped table-hover">
                         <thead>
                             <tr>
                                 <th>Username</th><th>Profile</th><th>Status</th><th>Time Limit</th>
@@ -683,21 +698,27 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr class="empty-state-row"><td colspan="9" class="empty-state-td"><div class="empty-state-container" style="min-height: 200px;"><div class="loading-spinner" style="font-size: 1.8em; margin-bottom: 1.2rem; color: var(--primary-color);"></div><h5 class="empty-state-title" style="margin-bottom: 0.5rem;">Loading users...</h5><p class="empty-state-text">Please wait while we fetch the user data from the router.</p></div></td></tr>
+                            <tr class="empty-state-row"><td colspan="9" class="empty-state-td"><div class="empty-state-container" style="min-height: 200px;"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><h5 class="empty-state-title mt-3" style="margin-bottom: 0.5rem;">Loading users...</h5><p class="empty-state-text">Please wait while we fetch the user data from the router.</p></div></td></tr>
                         </tbody>
                     </table>
                 </div>
-                 <div class="panel-header" style="margin-top: 2rem; display: flex; justify-content: space-between; align-items: center;">
+                 <div class="panel-header d-flex justify-content-between align-items-center mt-4">
                     <h3>Export Users</h3>
                 </div>
-                 <div style="display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;">
-                    <div class="form-group" style="flex-grow: 1;">
-                         <label for="exportProfileFilter">Filter by Profile</label>
-                        <select id="exportProfileFilter"></select>
+                 <div class="row g-3 align-items-end">
+                    <div class="col-md-4">
+                         <label for="exportProfileFilter" class="form-label">Filter by Profile</label>
+                        <select id="exportProfileFilter" class="form-select"></select>
                     </div>
-                    <button class="btn btn-success" onclick="triggerExport('csv')"><i class="fas fa-file-csv"></i> CSV</button>
-                    <button class="btn btn-primary" onclick="triggerExport('html_voucher')"><i class="fas fa-ticket-alt"></i> Vouchers (HTML)</button>
-                    <button class="btn btn-danger" onclick="triggerExport('pdf_voucher')"><i class="fas fa-file-pdf"></i> Vouchers (PDF)</button>
+                    <div class="col-auto">
+                        <button class="btn btn-success" onclick="triggerExport('csv')"><i class="fas fa-file-csv me-1"></i> CSV</button>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-info" onclick="triggerExport('html_voucher')"><i class="fas fa-ticket-alt me-1"></i> Vouchers (HTML)</button>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-danger" onclick="triggerExport('pdf_voucher')"><i class="fas fa-file-pdf me-1"></i> Vouchers (PDF)</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -706,32 +727,32 @@
             <div class="panel">
                 <h3 class="panel-header">Create Single User</h3>
                 <form id="createUserForm">
-                    <div class="form-grid">
-                        <div class="form-group"><label for="username">Username</label><input type="text" id="username" required></div>
-                        <div class="form-group"><label for="password">Password</label><input type="text" id="password" required></div>
-                        <div class="form-group"><label for="profile">Profile</label><select id="profile"></select></div>
-                        <div class="form-group"><label for="timeLimit">Time Limit</label><input type="text" id="timeLimit" placeholder="e.g., 1h30m, 30d"></div>
-                        <div class="form-group"><label for="dataLimit">Data Limit (MB)</label><input type="number" id="dataLimit" placeholder="e.g., 500"></div>
-                        <div class="form-group"><label for="comment">Comment</label><input type="text" id="comment"></div>
+                    <div class="row g-3">
+                        <div class="col-md-6 form-group"><label for="username" class="form-label">Username</label><input type="text" id="username" class="form-control" required></div>
+                        <div class="col-md-6 form-group"><label for="password" class="form-label">Password</label><input type="text" id="password" class="form-control" required></div>
+                        <div class="col-md-6 form-group"><label for="profile" class="form-label">Profile</label><select id="profile" class="form-select"></select></div>
+                        <div class="col-md-6 form-group"><label for="timeLimit" class="form-label">Time Limit</label><input type="text" id="timeLimit" class="form-control" placeholder="e.g., 1h30m, 30d"></div>
+                        <div class="col-md-6 form-group"><label for="dataLimit" class="form-label">Data Limit (MB)</label><input type="number" id="dataLimit" class="form-control" placeholder="e.g., 500"></div>
+                        <div class="col-md-6 form-group"><label for="comment" class="form-label">Comment</label><input type="text" id="comment" class="form-control"></div>
                     </div>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Create User</button>
+                    <button type="submit" class="btn btn-primary mt-3"><i class="fas fa-plus me-1"></i> Create User</button>
                 </form>
             </div>
             <div class="panel">
                 <h3 class="panel-header">Batch Voucher Generation</h3>
                 <form id="bulkCreateUserForm">
-                     <div class="form-grid">
-                        <div class="form-group"><label for="bulkNumberOfUsers">Number of Vouchers</label><input type="number" id="bulkNumberOfUsers" required></div>
-                        <div class="form-group"><label for="bulkProfile">Profile</label><select id="bulkProfile" required></select></div>
-                        <div class="form-group"><label for="bulkTimeLimit">Time Limit</label><input type="text" id="bulkTimeLimit" placeholder="e.g., 2h, 30d"></div>
-                        <div class="form-group"><label for="bulkDataLimit">Total Data Limit (MB)</label><input type="number" id="bulkDataLimit" placeholder="e.g., 1024"></div>
-                        <div class="form-group"><label for="bulkCommentPrefix">Batch Name / Comment Prefix</label><input type="text" id="bulkCommentPrefix" placeholder="e.g., Event2024"></div>
-                        <div class="form-group"><label for="bulkUsernamePrefix">Username Prefix (Optional)</label><input type="text" id="bulkUsernamePrefix" placeholder="e.g., v-"></div>
-                        <div class="form-group"><label for="bulkUsernameLength">Username Length (after prefix)</label><input type="number" id="bulkUsernameLength" value="6"></div>
-                        <div class="form-group"><label for="bulkPasswordLength">Password Length</label><input type="number" id="bulkPasswordLength" value="6"></div>
-                        <div class="form-group">
-                            <label for="bulkUsernameCharset">Username Characters</label>
-                            <select id="bulkUsernameCharset">
+                     <div class="row g-3">
+                        <div class="col-md-6 form-group"><label for="bulkNumberOfUsers" class="form-label">Number of Vouchers</label><input type="number" id="bulkNumberOfUsers" class="form-control" required></div>
+                        <div class="col-md-6 form-group"><label for="bulkProfile" class="form-label">Profile</label><select id="bulkProfile" class="form-select" required></select></div>
+                        <div class="col-md-6 form-group"><label for="bulkTimeLimit" class="form-label">Time Limit</label><input type="text" id="bulkTimeLimit" class="form-control" placeholder="e.g., 2h, 30d"></div>
+                        <div class="col-md-6 form-group"><label for="bulkDataLimit" class="form-label">Total Data Limit (MB)</label><input type="number" id="bulkDataLimit" class="form-control" placeholder="e.g., 1024"></div>
+                        <div class="col-md-6 form-group"><label for="bulkCommentPrefix" class="form-label">Batch Name / Comment Prefix</label><input type="text" id="bulkCommentPrefix" class="form-control" placeholder="e.g., Event2024"></div>
+                        <div class="col-md-6 form-group"><label for="bulkUsernamePrefix" class="form-label">Username Prefix (Optional)</label><input type="text" id="bulkUsernamePrefix" class="form-control" placeholder="e.g., v-"></div>
+                        <div class="col-md-6 form-group"><label for="bulkUsernameLength" class="form-label">Username Length (after prefix)</label><input type="number" id="bulkUsernameLength" class="form-control" value="6"></div>
+                        <div class="col-md-6 form-group"><label for="bulkPasswordLength" class="form-label">Password Length</label><input type="number" id="bulkPasswordLength" class="form-control" value="6"></div>
+                        <div class="col-md-6 form-group">
+                            <label for="bulkUsernameCharset" class="form-label">Username Characters</label>
+                            <select id="bulkUsernameCharset" class="form-select">
                                 <option value="alphanumeric" selected>Alphanumeric (Upper & Lower)</option>
                                 <option value="alphanumeric_upper">Alphanumeric (Upper Case Only)</option>
                                 <option value="alphanumeric_lower">Alphanumeric (Lower Case Only)</option>
@@ -740,9 +761,9 @@
                                 <option value="alpha_lower">Alphabetical (Lower Case Only)</option>
                             </select>
                         </div>
-                        <div class="form-group">
-                            <label for="bulkPasswordCharset">Password Characters</label>
-                            <select id="bulkPasswordCharset">
+                        <div class="col-md-6 form-group">
+                            <label for="bulkPasswordCharset" class="form-label">Password Characters</label>
+                            <select id="bulkPasswordCharset" class="form-select">
                                 <option value="alphanumeric_symbols" selected>Alphanumeric + Symbols</option>
                                 <option value="alphanumeric">Alphanumeric (Upper & Lower)</option>
                                 <option value="alphanumeric_upper">Alphanumeric (Upper Case Only)</option>
@@ -753,16 +774,16 @@
                             </select>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-success"><i class="fas fa-users-cog"></i> Generate Vouchers</button>
+                    <button type="submit" class="btn btn-success mt-3"><i class="fas fa-users-cog me-1"></i> Generate Vouchers</button>
                 </form>
-                <div id="bulkCreateResultDisplay" style="display:none; margin-top: 1.5rem;">
+                <div id="bulkCreateResultDisplay" style="display:none;" class="mt-4">
                     <h4>Generated Credentials:</h4>
-                    <textarea id="bulkCreateCredentials" rows="8" class="form-group" style="width:100%; font-family: monospace;" readonly></textarea>
-                    <button id="exportVouchersHTMLButton" class="btn btn-info" style="margin-top: 10px; display: none;">
-                        <i class="fas fa-eye"></i> View Vouchers (HTML)
+                    <textarea id="bulkCreateCredentials" rows="8" class="form-control mb-2" style="font-family: monospace;" readonly></textarea>
+                    <button id="exportVouchersHTMLButton" class="btn btn-info mt-2 me-2" style="display: none;">
+                        <i class="fas fa-eye me-1"></i> View Vouchers (HTML)
                     </button>
-                    <button id="exportVouchersPDFButton" class="btn btn-danger" style="margin-top: 10px; margin-left: 10px; display: none;">
-                        <i class="fas fa-file-pdf"></i> Download Vouchers (PDF)
+                    <button id="exportVouchersPDFButton" class="btn btn-danger mt-2" style="display: none;">
+                        <i class="fas fa-file-pdf me-1"></i> Download Vouchers (PDF)
                     </button>
                 </div>
             </div>
@@ -770,12 +791,12 @@
 
         <div id="sessions" class="tab-content" role="tabpanel" aria-labelledby="tab-sessions">
              <div class="panel">
-                <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div class="panel-header d-flex justify-content-between align-items-center">
                     <h3>Active Sessions</h3>
                     <button class="btn btn-primary btn-sm" onclick="loadActiveSessions()"><i class="fas fa-sync-alt"></i> Refresh</button>
                 </div>
-                <div class="table-container">
-                    <table id="sessionsTable">
+                <div class="table-responsive">
+                    <table id="sessionsTable" class="table table-striped table-hover">
                         <thead>
                             <tr>
                                 <th>Username</th><th>IP Address</th><th>MAC Address</th><th>Uptime</th>
@@ -783,7 +804,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                             <tr class="empty-state-row"><td colspan="7" class="empty-state-td"><div class="empty-state-container" style="min-height: 200px;"><div class="loading-spinner" style="font-size: 1.8em; margin-bottom: 1.2rem; color: var(--primary-color);"></div><h5 class="empty-state-title" style="margin-bottom: 0.5rem;">Loading sessions...</h5><p class="empty-state-text">Please wait while we fetch active session data.</p></div></td></tr>
+                             <tr class="empty-state-row"><td colspan="7" class="empty-state-td"><div class="empty-state-container" style="min-height: 200px;"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><h5 class="empty-state-title mt-3" style="margin-bottom: 0.5rem;">Loading sessions...</h5><p class="empty-state-text">Please wait while we fetch active session data.</p></div></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -791,11 +812,11 @@
         </div>
 
         <div id="analytics" class="tab-content" role="tabpanel" aria-labelledby="tab-analytics">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-                <div class="panel" style="flex-grow: 1; margin: 0; text-align: center;">
-                    <h3 id="analyticsTotalData" style="font-size: 1.5em; color: var(--primary-color);">Total Data Transferred: -</h3>
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="panel flex-grow-1 mb-0 text-center py-3">
+                    <h3 id="analyticsTotalData" class="h4 text-primary mb-0">Total Data Transferred: -</h3>
                 </div>
-                <button id="refreshAnalyticsButton" class="btn btn-primary" style="margin-left: 1.5rem;"><i class="fas fa-sync-alt"></i> Refresh</button>
+                <button id="refreshAnalyticsButton" class="btn btn-primary ms-3"><i class="fas fa-sync-alt"></i> Refresh</button>
             </div>
             
             <div class="analytics-grid">
@@ -823,44 +844,101 @@
                 </div>
             </div>
         </div>
+
+        <div id="historical-analytics" class="tab-content" role="tabpanel" aria-labelledby="tab-historical-analytics">
+            <div class="panel">
+                <h3 class="panel-header">Historical Data Analysis</h3>
+                <div class="row g-3 mb-4 align-items-end">
+                    <div class="col-md-3">
+                        <label for="historicalStartDate" class="form-label">Start Date</label>
+                        <input type="date" id="historicalStartDate" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="historicalEndDate" class="form-label">End Date</label>
+                        <input type="date" id="historicalEndDate" class="form-control">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="historicalInterval" class="form-label">Interval</label>
+                        <select id="historicalInterval" class="form-select">
+                            <option value="daily" selected>Daily</option>
+                            <option value="weekly">Weekly</option>
+                            <option value="monthly">Monthly</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <button id="loadHistoricalDataButton" class="btn btn-primary w-100"><i class="fas fa-search me-1"></i> Load Data</button>
+                    </div>
+                </div>
+
+                <div class="analytics-grid">
+                    <div class="panel">
+                        <h3 class="panel-header">Total Data Usage Over Time</h3>
+                        <div class="chart-container">
+                            <canvas id="historicalUsageChart"></canvas>
+                             <div id="historicalUsageChartEmptyState" class="empty-state-container" style="display: none; position: absolute; top: 0; left: 0; min-height: 300px;">
+                                <div class="empty-state-icon"><i class="fas fa-chart-bar"></i></div>
+                                <h5 class="empty-state-title">No Data</h5>
+                                <p class="empty-state-text">No historical usage data to display for the selected period.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="panel">
+                        <h3 class="panel-header">Peak Concurrent Users Over Time</h3>
+                        <div class="chart-container">
+                            <canvas id="historicalPeakUsersChart"></canvas>
+                            <div id="historicalPeakUsersChartEmptyState" class="empty-state-container" style="display: none; position: absolute; top: 0; left: 0; min-height: 300px;">
+                                <div class="empty-state-icon"><i class="fas fa-users"></i></div>
+                                <h5 class="empty-state-title">No Data</h5>
+                                <p class="empty-state-text">No peak user data to display for the selected period.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                 <div class="panel" style="margin-top: 2rem;">
+                    <h3 class="panel-header">User Specific Activity (Coming Soon)</h3>
+                    <p>Detailed activity logs for individual users will be available here.</p>
+                    <!-- Placeholder for user selection and activity display -->
+                </div>
+            </div>
+        </div>
         
         <div id="maintenance" class="tab-content" role="tabpanel" aria-labelledby="tab-maintenance">
             <div class="panel">
-                <h3 class="panel-header"><i class="fas fa-id-badge" style="margin-right: 8px;"></i>User Profiles</h3>
-                <button class="btn btn-success" style="margin-bottom: 1rem;" onclick="openProfileModal()"><i class="fas fa-plus"></i> Add Profile</button>
-                <div class="table-container">
-                    <table id="profilesTable">
+                <h3 class="panel-header"><i class="fas fa-id-badge me-2"></i>User Profiles</h3>
+                <button class="btn btn-success mb-3" onclick="openProfileModal()"><i class="fas fa-plus me-1"></i> Add Profile</button>
+                <div class="table-responsive">
+                    <table id="profilesTable" class="table table-striped table-hover">
                         <thead><tr><th>Name</th><th>Rate Limit</th><th>Session Timeout</th><th>Shared Users</th><th>Actions</th></tr></thead>
-                        <tbody><tr><td colspan="5" style="text-align: center;">Loading profiles...</td></tr></tbody>
+                        <tbody><tr><td colspan="5" class="text-center">Loading profiles...</td></tr></tbody>
                     </table>
                 </div>
             </div>
             <div class="panel">
-                <h3 class="panel-header"><i class="fas fa-broom" style="margin-right: 8px;"></i>Cleanup</h3>
+                <h3 class="panel-header"><i class="fas fa-broom me-2"></i>Cleanup</h3>
                 <p>Automatically find and delete users who have used up their time or data allowance.</p>
-                <button class="btn btn-danger" onclick="deleteExpiredUsers()"><i class="fas fa-trash-alt"></i> Delete Expired Users</button>
+                <button class="btn btn-danger" onclick="deleteExpiredUsers()"><i class="fas fa-trash-alt me-1"></i> Delete Expired Users</button>
             </div>
 
             <div class="panel">
-                <h3 class="panel-header"><i class="fas fa-user-tag" style="margin-right: 8px;"></i>Delete Users by Profile</h3>
-                <div class="form-group">
-                    <label for="deleteByProfileSelect">Select Profile to Delete Users From:</label>
-                    <select id="deleteByProfileSelect"></select> 
+                <h3 class="panel-header"><i class="fas fa-user-tag me-2"></i>Delete Users by Profile</h3>
+                <div class="mb-3">
+                    <label for="deleteByProfileSelect" class="form-label">Select Profile to Delete Users From:</label>
+                    <select id="deleteByProfileSelect" class="form-select"></select>
                 </div>
-                <button id="deleteByProfileButton" class="btn btn-danger"><i class="fas fa-trash-alt"></i> Delete Users by Profile</button>
+                <button id="deleteByProfileButton" class="btn btn-danger"><i class="fas fa-trash-alt me-1"></i> Delete Users by Profile</button>
             </div>
 
             <div class="panel">
-                <h3 class="panel-header"><i class="fas fa-user-check" style="margin-right: 8px;"></i>Delete Users by Active Status</h3>
-                <div class="form-group">
-                    <label for="deleteByStatusSelect">Select User Status to Delete:</label>
-                    <select id="deleteByStatusSelect"> 
+                <h3 class="panel-header"><i class="fas fa-user-check me-2"></i>Delete Users by Active Status</h3>
+                <div class="mb-3">
+                    <label for="deleteByStatusSelect" class="form-label">Select User Status to Delete:</label>
+                    <select id="deleteByStatusSelect" class="form-select">
                         <option value="">-- Select Status --</option>
                         <option value="active">Active Users</option>
                         <option value="disabled">Disabled Users</option>
                     </select>
                 </div>
-                <button id="deleteByStatusButton" class="btn btn-danger"><i class="fas fa-user-slash"></i> Delete Users by Status</button>
+                <button id="deleteByStatusButton" class="btn btn-danger"><i class="fas fa-user-slash me-1"></i> Delete Users by Status</button>
             </div>
         </div>
 
@@ -868,16 +946,16 @@
             <div class="panel">
                 <h3 class="panel-header">Router Connection</h3>
                  <form id="configForm">
-                    <div class="form-grid">
-                        <div class="form-group"><label>Router IP Address</label><input type="text" id="routerHost"></div>
-                        <div class="form-group"><label>API Port</label><input type="number" id="routerPort"></div>
-                        <div class="form-group"><label>Username</label><input type="text" id="routerUsername"></div>
-                        <div class="form-group"><label>Password</label><input type="password" id="routerPassword" placeholder="Enter new password to update"></div>
-                        <div class="form-group"><label>Hotspot Login URL (for QR Codes)</label><input type="text" id="hotspotLoginUrl" placeholder="e.g. http://my.hotspot/login"></div>
+                    <div class="row g-3">
+                        <div class="col-md-6"><label class="form-label">Router IP Address</label><input type="text" id="routerHost" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">API Port</label><input type="number" id="routerPort" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">Username</label><input type="text" id="routerUsername" class="form-control"></div>
+                        <div class="col-md-6"><label class="form-label">Password</label><input type="password" id="routerPassword" class="form-control" placeholder="Enter new password to update"></div>
+                        <div class="col-12"><label class="form-label">Hotspot Login URL (for QR Codes)</label><input type="text" id="hotspotLoginUrl" class="form-control" placeholder="e.g. http://my.hotspot/login"></div>
                     </div>
-                    <div style="display: flex; gap: 1rem;">
-                        <button type="button" class="btn btn-primary" onclick="testConnection()"><i class="fas fa-plug"></i> Test</button>
-                        <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Save</button>
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-primary me-2" onclick="testConnection()"><i class="fas fa-plug me-1"></i> Test</button>
+                        <button type="submit" class="btn btn-success"><i class="fas fa-save me-1"></i> Save</button>
                     </div>
                 </form>
             </div>
@@ -890,21 +968,21 @@
                 <form id="editUserForm">
                     <div class="modal-header">
                         <h5 class="modal-title" id="userModalTitle">Edit User: <span id="editUsernameDisplay"></span></h5>
-                        <button type="button" class="close-button" onclick="closeModal('userModal')" aria-label="Close">&times;</button>
+                        <button type="button" class="btn-close" onclick="closeModal('userModal')" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" id="editUsernameOrig">
-                        <div class="form-group"><label>New Password</label><input type="text" id="editPassword" placeholder="Leave blank to keep current"></div>
-                        <div class="form-group"><label>Profile</label><select id="editProfile"></select></div>
-                        <div class="form-group"><label>Time Limit</label><input type="text" id="editTimeLimit"></div>
-                        <div class="form-group"><label>Data Limit (MB)</label><input type="number" id="editDataLimit"></div>
-                        <div class="form-group"><label>Comment</label><input type="text" id="editComment"></div>
-                        <div class="form-group" style="display: flex; align-items: center; gap: 10px;">
-                            <input type="checkbox" id="editDisabled" style="width: auto;"><label for="editDisabled" style="margin: 0;">Disabled</label>
+                        <div class="mb-3"><label class="form-label">New Password</label><input type="text" id="editPassword" class="form-control" placeholder="Leave blank to keep current"></div>
+                        <div class="mb-3"><label class="form-label">Profile</label><select id="editProfile" class="form-select"></select></div>
+                        <div class="mb-3"><label class="form-label">Time Limit</label><input type="text" id="editTimeLimit" class="form-control"></div>
+                        <div class="mb-3"><label class="form-label">Data Limit (MB)</label><input type="number" id="editDataLimit" class="form-control"></div>
+                        <div class="mb-3"><label class="form-label">Comment</label><input type="text" id="editComment" class="form-control"></div>
+                        <div class="form-check mb-3">
+                            <input type="checkbox" id="editDisabled" class="form-check-input"><label for="editDisabled" class="form-check-label">Disabled</label>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn" onclick="closeModal('userModal')">Cancel</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save Changes</button>
                     </div>
                 </form>
@@ -918,17 +996,17 @@
                 <form id="profileForm">
                     <div class="modal-header">
                         <h5 class="modal-title" id="profileModalTitle">Add New Profile</h5>
-                        <button type="button" class="close-button" onclick="closeModal('profileModal')" aria-label="Close">&times;</button>
+                        <button type="button" class="btn-close" onclick="closeModal('profileModal')" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                         <input type="hidden" id="profileId">
-                        <div class="form-group"><label for="profileName">Name</label><input type="text" id="profileName" required></div>
-                        <div class="form-group"><label for="profileRateLimit">Rate Limit (Upload/Download)</label><input type="text" id="profileRateLimit" placeholder="e.g., 512k/2M"></div>
-                        <div class="form-group"><label for="profileSessionTimeout">Session Timeout</label><input type="text" id="profileSessionTimeout" placeholder="e.g., 1d 00:00:00"></div>
-                        <div class="form-group"><label for="profileSharedUsers">Shared Users</label><input type="number" id="profileSharedUsers" placeholder="e.g., 1"></div>
+                        <div class="mb-3"><label for="profileName" class="form-label">Name</label><input type="text" id="profileName" class="form-control" required></div>
+                        <div class="mb-3"><label for="profileRateLimit" class="form-label">Rate Limit (Upload/Download)</label><input type="text" id="profileRateLimit" class="form-control" placeholder="e.g., 512k/2M"></div>
+                        <div class="mb-3"><label for="profileSessionTimeout" class="form-label">Session Timeout</label><input type="text" id="profileSessionTimeout" class="form-control" placeholder="e.g., 1d 00:00:00"></div>
+                        <div class="mb-3"><label for="profileSharedUsers" class="form-label">Shared Users</label><input type="number" id="profileSharedUsers" class="form-control" placeholder="e.g., 1"></div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn" onclick="closeModal('profileModal')">Cancel</button>
+                        <button type="button" class="btn btn-secondary" onclick="closeModal('profileModal')">Cancel</button>
                         <button type="submit" class="btn btn-primary">Save Profile</button>
                     </div>
                 </form>
@@ -948,6 +1026,8 @@ let cachedTranslations = {}; // For storing fetched translations
 // Chart instances
 let profileUsageChartInstance;
 let topUsersChartInstance;
+let historicalUsageChartInstance;
+let historicalPeakUsersChartInstance;
 
 // Helper function to get translations
 function getTranslation(key, ...args) {
@@ -972,15 +1052,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Theme Toggle Logic
     const themeToggle = document.getElementById('themeToggleCheckbox');
     const themeToggleLabel = document.getElementById('themeToggleLabel');
-    const body = document.body;
+    const body = document.body; // Keep for .dark-mode class if needed for custom non-BS components
+    const htmlElement = document.documentElement;
 
     function applyTheme(theme) {
+        htmlElement.setAttribute('data-bs-theme', theme); // Bootstrap 5.3+ way
         if (theme === 'dark') {
-            body.classList.add('dark-mode');
+            body.classList.add('dark-mode'); // Keep for custom styles if any
             if (themeToggle) themeToggle.checked = true;
             if (themeToggleLabel) themeToggleLabel.textContent = 'Dark Mode';
         } else {
-            body.classList.remove('dark-mode');
+            body.classList.remove('dark-mode'); // Keep for custom styles if any
             if (themeToggle) themeToggle.checked = false;
             if (themeToggleLabel) themeToggleLabel.textContent = 'Light Mode';
         }
@@ -1167,7 +1249,46 @@ document.addEventListener('DOMContentLoaded', () => {
     if (refreshAnalyticsBtn) {
         refreshAnalyticsBtn.addEventListener('click', loadAnalyticsData);
     }
+
+    const loadHistoricalDataBtn = document.getElementById('loadHistoricalDataButton');
+    if (loadHistoricalDataBtn) {
+        loadHistoricalDataBtn.addEventListener('click', loadHistoricalAnalytics);
+    }
+
+    // Set default dates for historical analytics
+    const today = new Date();
+    const endDateInput = document.getElementById('historicalEndDate');
+    if(endDateInput) endDateInput.valueAsDate = today;
+    const startDateInput = document.getElementById('historicalStartDate');
+    if(startDateInput) {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(today.getDate() - 7);
+        startDateInput.valueAsDate = sevenDaysAgo;
+    }
+
 });
+
+// Helper function to set loading state for buttons
+function setButtonLoadingState(button, isLoading, originalHTML = null) {
+    if (!button) return originalHTML;
+
+    if (isLoading) {
+        const currentOriginalHTML = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...`;
+        return currentOriginalHTML; // Return the original HTML to be stored by the caller
+    } else {
+        button.disabled = false;
+        if (originalHTML) {
+            button.innerHTML = originalHTML;
+        }
+        // If originalHTML is not provided, it assumes the text was just "Loading..."
+        // This part might need refinement if buttons have complex initial content.
+        // For now, most buttons are simple text + icon.
+        return null;
+    }
+}
+
 
 async function init() {
     // Fetch translations first
@@ -1749,6 +1870,9 @@ function displayProfiles() {
 // --- Event Handlers & Actions ---
 async function handleConfigSave(e) {
     e.preventDefault();
+    const saveButton = e.target.querySelector('button[type="submit"]');
+    let originalButtonHTML = setButtonLoadingState(saveButton, true);
+
     const payload = {
         mikrotik: {
             host: document.getElementById('routerHost').value,
@@ -1765,10 +1889,14 @@ async function handleConfigSave(e) {
         showAlert('globalAlert', 'success', 'Configuration saved! Testing new connection...');
         await checkConnection();
     }
+    setButtonLoadingState(saveButton, false, originalButtonHTML);
 }
 
 async function handleCreateUser(e) {
     e.preventDefault();
+    const createButton = e.target.querySelector('button[type="submit"]');
+    let originalButtonHTML = setButtonLoadingState(createButton, true);
+
     const payload = {
         name: document.getElementById('username').value,
         password: document.getElementById('password').value,
@@ -1784,11 +1912,14 @@ async function handleCreateUser(e) {
         await loadUsers();
         await loadDashboardStats();
     }
+    setButtonLoadingState(createButton, false, originalButtonHTML);
 }
 
 async function handleBulkCreateUsers(e) {
     e.preventDefault();
-    const form = e.target;
+    const generateButton = e.target.querySelector('button[type="submit"]');
+    let originalButtonHTML = setButtonLoadingState(generateButton, true);
+    // const form = e.target; // form variable was not used
     const payload = {
         number_of_users: parseInt(document.getElementById('bulkNumberOfUsers').value),
         profile: document.getElementById('bulkProfile').value,
@@ -1839,10 +1970,14 @@ async function handleBulkCreateUsers(e) {
         if(exportPDFBtn) exportPDFBtn.style.display = 'none';
         resultDisplayDiv.style.display = 'none'; 
     }
+    setButtonLoadingState(generateButton, false, originalButtonHTML);
 }
 
 async function handleEditUser(e) {
     e.preventDefault();
+    const saveButton = e.target.querySelector('button[type="submit"]');
+    let originalButtonHTML = setButtonLoadingState(saveButton, true);
+
     const username = document.getElementById('editUsernameOrig').value;
     const payload = {
         profile: document.getElementById('editProfile').value,
@@ -1860,10 +1995,14 @@ async function handleEditUser(e) {
         closeModal('userModal');
         await loadUsers();
     }
+    setButtonLoadingState(saveButton, false, originalButtonHTML);
 }
 
 async function handleProfileSave(e) {
     e.preventDefault();
+    const saveButton = e.target.querySelector('button[type="submit"]');
+    let originalButtonHTML = setButtonLoadingState(saveButton, true);
+
     const profileId = document.getElementById('profileId').value;
     const payload = {
         name: document.getElementById('profileName').value,
@@ -1881,13 +2020,15 @@ async function handleProfileSave(e) {
         closeModal('profileModal');
         await loadProfiles();
     }
+    setButtonLoadingState(saveButton, false, originalButtonHTML);
 }
 
 async function deleteUser(username) {
-    if (!confirm(`Are you sure you want to delete user "${username}"?`)) return;
+    if (!confirm(getTranslation('confirmDeleteUser', username))) return;
+    // Potentially add loading state to the specific delete button if it's a long operation, though usually fast.
     const result = await apiCall(`/users/${username}`, { method: 'DELETE' });
     if(result && result.success) {
-        showAlert('globalAlert', 'success', `User "${username}" deleted.`);
+        showAlert('globalAlert', 'success', getTranslation('User "{0}" deleted.', username));
         await loadUsers();
         await loadDashboardStats();
     }
@@ -1895,38 +2036,46 @@ async function deleteUser(username) {
 
 async function disconnectUser(activeId) {
     const session = currentSessions.find(s => s['.id'] === activeId);
-    if (!confirm(`Are you sure you want to disconnect user "${session.user}"?`)) return;
+    const username = session ? session.user : 'this user';
+    if (!confirm(getTranslation('confirmDisconnectUser', username))) return;
+    // Similar to deleteUser, button-specific loading state could be added if needed.
     const result = await apiCall(`/disconnect-user/${activeId}`, { method: 'POST' });
     if (result && result.success) {
-        showAlert('globalAlert', 'success', `User disconnected.`);
+        showAlert('globalAlert', 'success', getTranslation('User disconnected.'));
         await loadActiveSessions();
         await loadDashboardStats();
     }
 }
 
 async function deleteProfile(id, name) {
-    if (!confirm(`Are you sure you want to delete profile "${name}"? This cannot be undone.`)) return;
+    if (!confirm(getTranslation('confirmDeleteProfile', name))) return;
     const result = await apiCall(`/profiles/${id}`, { method: 'DELETE' });
     if (result && result.success) {
-        showAlert('globalAlert', 'success', `Profile "${name}" deleted.`);
+        showAlert('globalAlert', 'success', getTranslation('Profile "{0}" deleted.', name));
         await loadProfiles();
     }
 }
 
 async function deleteExpiredUsers() {
+    const button = event.target;
+    let originalButtonHTML = null;
     if (!confirm(getTranslation('confirmDeleteExpiredUsers'))) return;
+    originalButtonHTML = setButtonLoadingState(button, true);
+
     const result = await apiCall('/delete-expired-users', { method: 'POST' });
     if(result && result.success) {
         showAlert('globalAlert', 'success', result.message + (result.deleted_count ? ` Deleted ${result.deleted_count} user(s).` : ''));
         await loadUsers();
         await loadDashboardStats();
-    } else if (result) { // API call was made, but operation wasn't successful (e.g. success:false from backend)
+    } else if (result) {
         showAlert('globalAlert', 'warning', result.message || getTranslation('Operation failed, no users deleted.'));
     }
-    // If result is null (apiCall failed due to network etc.), apiCall itself shows an alert.
+    setButtonLoadingState(button, false, originalButtonHTML);
 }
 
 async function handleDeleteUsersByProfile() {
+    const button = event.target;
+    let originalButtonHTML = null;
     const profileSelect = document.getElementById('deleteByProfileSelect');
     const profileName = profileSelect.value;
 
@@ -1935,23 +2084,26 @@ async function handleDeleteUsersByProfile() {
         return;
     }
 
-    if (!confirm(getTranslation('Are you sure you want to delete ALL users from profile "{0}"? This action cannot be undone and is permanent.').replace('{0}', profileName))) {
+    if (!confirm(getTranslation('Are you sure you want to delete ALL users from profile "{0}"? This action cannot be undone and is permanent.', profileName))) {
         return;
     }
+    originalButtonHTML = setButtonLoadingState(button, true);
 
     const result = await apiCall(`/users/delete-by-profile/${encodeURIComponent(profileName)}`, { method: 'DELETE' });
 
     if (result && result.success) {
-        // Assuming result.message is already translated by the backend
         showAlert('globalAlert', 'success', result.message || getTranslation('Successfully processed users for profile {0}. Deleted {1} user(s).', profileName, result.deleted_count));
         await loadUsers();
         await loadDashboardStats();
     } else if (result) { 
         showAlert('globalAlert', 'danger', result.message || getTranslation('Failed to delete users from profile {0}.', profileName));
     }
+    setButtonLoadingState(button, false, originalButtonHTML);
 }
 
 async function handleDeleteUsersByStatus() {
+    const button = event.target;
+    let originalButtonHTML = null;
     const statusSelect = document.getElementById('deleteByStatusSelect');
     const status = statusSelect.value; // 'active' or 'disabled'
 
@@ -1960,11 +2112,12 @@ async function handleDeleteUsersByStatus() {
         return;
     }
     
-    const statusText = status === 'disabled' ? getTranslation('Disabled') : getTranslation('Active');
+    const statusText = status === 'disabled' ? getTranslation('Disabled Users') : getTranslation('Active Users'); // Use translated full terms
 
-    if (!confirm(getTranslation('Are you sure you want to delete all {0} users? This action cannot be undone and is permanent.').replace('{0}', statusText))) {
+    if (!confirm(getTranslation('Are you sure you want to delete all {0} users? This action cannot be undone and is permanent.', statusText))) {
         return;
     }
+    originalButtonHTML = setButtonLoadingState(button, true);
 
     const result = await apiCall(`/users/delete-by-active-status/${status}`, { method: 'DELETE' });
 
@@ -1975,6 +2128,7 @@ async function handleDeleteUsersByStatus() {
     } else if (result) {
         showAlert('globalAlert', 'danger', result.message || getTranslation('Failed to delete {0} users.', statusText));
     }
+    setButtonLoadingState(button, false, originalButtonHTML);
 }
 
 function triggerExport(format) {
@@ -1987,12 +2141,12 @@ function triggerExport(format) {
 }
 
 async function testConnection() {
-    const button = event.target;
-    button.innerHTML = '<span class="loading-spinner"></span> Testing...';
-    button.disabled = true;
-    await checkConnection();
-    button.innerHTML = '<i class="fas fa-plug"></i> Test';
-    button.disabled = false;
+    const button = document.querySelector('#configForm button[onclick="testConnection()"]'); // More specific selector
+    let originalButtonHTML = setButtonLoadingState(button, true, button.innerHTML); // Pass current HTML as original
+
+    await checkConnection(); // checkConnection already handles alerts for its status
+
+    setButtonLoadingState(button, false, originalButtonHTML);
 }
 
 // --- Modals & UI Helpers ---
@@ -2044,12 +2198,34 @@ window.onclick = function(event) {
 }
 
 function showAlert(elementId, type, message) {
-    const alert = document.getElementById(elementId);
-    if (!alert) return;
-    alert.className = `alert alert-${type}`;
-    alert.innerHTML = message;
-    alert.style.display = 'block';
-    setTimeout(() => { alert.style.display = 'none'; }, 5000);
+    const alertEl = document.getElementById(elementId);
+    if (!alertEl) return;
+    // Map simple type to Bootstrap alert class
+    const bsType = type === 'danger' ? 'danger' :
+                   type === 'success' ? 'success' :
+                   type === 'warning' ? 'warning' : 'info'; // Default to info
+
+    alertEl.className = `alert alert-${bsType} alert-dismissible fade show`; // Add Bootstrap classes
+    alertEl.innerHTML = `${message}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`;
+    alertEl.style.display = 'block';
+
+    // Auto-hide is good, Bootstrap can also handle dismiss via button
+    // If you want auto-hide WITH Bootstrap, you might need to manage timeout manually
+    // as Bootstrap's JS might interfere or vice-versa.
+    // For now, let's keep the timeout for auto-dismissal.
+    setTimeout(() => {
+        // Gracefully hide if still visible
+        if (alertEl.classList.contains('show')) {
+            const bsAlert = bootstrap.Alert.getInstance(alertEl);
+            if (bsAlert) {
+                bsAlert.close();
+            } else {
+                // Fallback if Bootstrap's JS hasn't initialized on it for some reason
+                alertEl.style.display = 'none';
+                alertEl.classList.remove('show');
+            }
+        }
+    }, 7000); // Increased timeout slightly
 }
 
 let spinnerTimeout;
@@ -2265,6 +2441,177 @@ function formatBytes(bytes) {
     const i = Math.floor(Math.log(numBytes) / Math.log(k));
     return `${parseFloat((numBytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
+
+// --- Historical Analytics Functions ---
+async function loadHistoricalAnalytics() {
+    const startDate = document.getElementById('historicalStartDate').value;
+    const endDate = document.getElementById('historicalEndDate').value;
+    const interval = document.getElementById('historicalInterval').value;
+
+    if (!startDate || !endDate) {
+        showAlert('globalAlert', 'warning', 'Please select both a start and end date.');
+        return;
+    }
+    logger.info(`Loading historical data from ${startDate} to ${endDate}, interval: ${interval}`);
+
+    const button = document.getElementById('loadHistoricalDataButton');
+    const originalButtonHTML = setButtonLoadingState(button, true, button.innerHTML);
+
+    try {
+        // Fetch and render historical usage
+        const usageData = await apiCall(`/analytics/historical_usage?start_date=${startDate}&end_date=${endDate}&interval=${interval}`);
+        renderHistoricalUsageChart(usageData ? usageData.data : []);
+
+        // Fetch and render historical peak users
+        const peakUsersData = await apiCall(`/analytics/historical_peak_users?start_date=${startDate}&end_date=${endDate}&interval=${interval}`);
+        renderHistoricalPeakUsersChart(peakUsersData ? peakUsersData.data : []);
+    } catch (error) {
+        // apiCall already shows an alert, but we can log here too or do other cleanup
+        logger.error("Error during loadHistoricalAnalytics: ", error);
+        // Ensure charts are cleared or show error state if needed
+        renderHistoricalUsageChart([]);
+        renderHistoricalPeakUsersChart([]);
+    } finally {
+        setButtonLoadingState(button, false, originalButtonHTML);
+    }
+}
+
+function renderHistoricalUsageChart(data) {
+    const ctx = document.getElementById('historicalUsageChart').getContext('2d');
+    const emptyState = document.getElementById('historicalUsageChartEmptyState');
+    if (historicalUsageChartInstance) {
+        historicalUsageChartInstance.destroy();
+    }
+
+    if (!data || data.length === 0) {
+        emptyState.style.display = 'flex';
+        return;
+    }
+    emptyState.style.display = 'none';
+
+    const isDarkMode = document.body.classList.contains('dark-mode');
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    const labelColor = isDarkMode ? getComputedStyle(document.documentElement).getPropertyValue('--theme-text-secondary').trim() : getComputedStyle(document.documentElement).getPropertyValue('--theme-text-primary').trim();
+    const tooltipBgColor = isDarkMode ? '#2c3e50' : '#fff';
+    const tooltipTitleColor = isDarkMode ? '#ecf0f1' : '#2c3e50';
+    const tooltipBodyColor = isDarkMode ? '#ecf0f1' : '#2c3e50';
+
+    historicalUsageChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(d => d.timestamp),
+            datasets: [
+                {
+                    label: 'Total Data In',
+                    data: data.map(d => d.total_bytes_in),
+                    borderColor: getComputedStyle(document.documentElement).getPropertyValue('--success-color').trim(),
+                    backgroundColor: hexToRgba(getComputedStyle(document.documentElement).getPropertyValue('--success-color').trim(), 0.1),
+                    fill: true,
+                    tension: 0.1
+                },
+                {
+                    label: 'Total Data Out',
+                    data: data.map(d => d.total_bytes_out),
+                    borderColor: getComputedStyle(document.documentElement).getPropertyValue('--info-color').trim(),
+                    backgroundColor: hexToRgba(getComputedStyle(document.documentElement).getPropertyValue('--info-color').trim(), 0.1),
+                    fill: true,
+                    tension: 0.1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: gridColor },
+                    ticks: { color: labelColor, callback: value => formatBytes(value) }
+                },
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: labelColor }
+                }
+            },
+            plugins: {
+                legend: { labels: { color: labelColor } },
+                tooltip: {
+                    backgroundColor: tooltipBgColor, titleColor: tooltipTitleColor, bodyColor: tooltipBodyColor,
+                    callbacks: { label: context => `${context.dataset.label}: ${formatBytes(context.raw)}` }
+                }
+            }
+        }
+    });
+}
+
+function renderHistoricalPeakUsersChart(data) {
+    const ctx = document.getElementById('historicalPeakUsersChart').getContext('2d');
+    const emptyState = document.getElementById('historicalPeakUsersChartEmptyState');
+    if (historicalPeakUsersChartInstance) {
+        historicalPeakUsersChartInstance.destroy();
+    }
+
+    if (!data || data.length === 0) {
+        emptyState.style.display = 'flex';
+        return;
+    }
+    emptyState.style.display = 'none';
+
+    const isDarkMode = document.body.classList.contains('dark-mode');
+    const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)';
+    const labelColor = isDarkMode ? getComputedStyle(document.documentElement).getPropertyValue('--theme-text-secondary').trim() : getComputedStyle(document.documentElement).getPropertyValue('--theme-text-primary').trim();
+    const tooltipBgColor = isDarkMode ? '#2c3e50' : '#fff';
+    const tooltipTitleColor = isDarkMode ? '#ecf0f1' : '#2c3e50';
+    const tooltipBodyColor = isDarkMode ? '#ecf0f1' : '#2c3e50';
+    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim();
+
+
+    historicalPeakUsersChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.map(d => d.timestamp),
+            datasets: [{
+                label: 'Peak Concurrent Users',
+                data: data.map(d => d.peak_users),
+                backgroundColor: primaryColor,
+                 hoverBackgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--primary-color-darker').trim()
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    grid: { color: gridColor },
+                    ticks: { color: labelColor, stepSize: 1 } // Ensure y-axis shows whole numbers for users
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: labelColor }
+                }
+            },
+            plugins: {
+                legend: { labels: { color: labelColor } },
+                tooltip: {
+                     backgroundColor: tooltipBgColor, titleColor: tooltipTitleColor, bodyColor: tooltipBodyColor,
+                    callbacks: { label: context => `${context.dataset.label}: ${context.raw}` }
+                }
+            }
+        }
+    });
+}
+
+// Helper to convert hex color to rgba for chart backgrounds
+function hexToRgba(hex, alpha = 1) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 </script>
+<!-- Bootstrap JS Bundle with Popper -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
 </body>
 </html>

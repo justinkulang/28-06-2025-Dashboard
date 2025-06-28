@@ -6,7 +6,9 @@ from flask_babel import Babel, get_locale, _ # Re-add get_locale
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_wtf.csrf import CSRFProtect, generate_csrf # Import CSRFProtect and generate_csrf
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import timedelta
+from datetime import timedelta, datetime
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func, cast, Date, extract
 import librouteros
 from librouteros.exceptions import TrapError
 import socket
@@ -22,6 +24,8 @@ import io
 import csv
 from flask import Response
 import base64
+
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # Configure logging
 # logging.basicConfig(level=logging.INFO) # Will be replaced by more detailed config
@@ -90,6 +94,12 @@ app.config['BABEL_TRANSLATION_DIRECTORIES'] = 'translations'
 
 babel.init_app(app) # Initialize Babel with app context here
 
+# Database Configuration
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Will be set properly after config is loaded
+
+db = SQLAlchemy()
+
 # @babel.localeselector
 # def get_locale_func():
 #     # Try to get the language from the user's browser settings
@@ -113,6 +123,13 @@ class ConfigLoader:
     def _load_config(self):
         """Load configuration from config.json or create default if not exists."""
         default_config = {
+            "scheduler": {
+                "enabled": True,
+                "job_interval_minutes": 60
+            },
+            "database": {
+                "uri": f"sqlite:///{os.path.join(get_base_path(), 'hotspot_analytics.db')}"
+            },
             "mikrotik": {
                 "host": "192.168.88.1",
                 "port": 8728,
@@ -139,19 +156,15 @@ class ConfigLoader:
             with open(self.config_file, 'r') as f:
                 loaded_config = json.load(f)
                 # Deep merge with default to ensure new keys are present
-                # For mikrotik and server, update the default_config's sections with loaded values
-                default_config['mikrotik'].update(loaded_config.get('mikrotik', {}))
-                default_config['server'].update(loaded_config.get('server', {}))
-                
-                # For app_admin, ensure it exists in default_config then update it
-                # This handles cases where app_admin might not be in an old config file
-                if 'app_admin' not in default_config: # Should not happen given the new default_config structure
-                    default_config['app_admin'] = {}
-                default_config['app_admin'].update(loaded_config.get('app_admin', {}))
+                for key in ['scheduler', 'database', 'mikrotik', 'server', 'app_admin']:
+                    if key in loaded_config and isinstance(default_config.get(key), dict) and isinstance(loaded_config.get(key), dict):
+                        default_config[key].update(loaded_config[key])
+                    elif key in loaded_config: # Handle cases where the value might not be a dict (e.g. if a user manually edits it)
+                        default_config[key] = loaded_config[key]
                 
                 return default_config
         else:
-            # If config file doesn't exist, write the full default_config (including new app_admin)
+            # If config file doesn't exist, write the full default_config
             with open(self.config_file, 'w') as f:
                 json.dump(default_config, f, indent=4)
             return default_config
@@ -200,6 +213,11 @@ class ConfigLoader:
 config_loader = ConfigLoader()
 app_config = config_loader.get_config()
 
+# Set SQLAlchemy Database URI from loaded config
+app.config['SQLALCHEMY_DATABASE_URI'] = app_config.get('database', {}).get('uri', f"sqlite:///{os.path.join(get_base_path(), 'hotspot_analytics_fallback.db')}")
+logger.info(f"SQLAlchemy Database URI set to: {app.config['SQLALCHEMY_DATABASE_URI']}")
+
+db.init_app(app)
 
 # --- Setup Logging Handlers (after app_config is available) ---
 def setup_logging(app_config_instance):
@@ -241,6 +259,31 @@ def setup_logging(app_config_instance):
         _logger.error(f"Failed to configure file logging: {e}", exc_info=True)
 
 setup_logging(app_config) # Call the setup function with the loaded app_config
+
+# --- Database Models ---
+class UserActivityLog(db.Model):
+    __tablename__ = 'user_activity_log'
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    username = db.Column(db.String(255), index=True)
+    profile = db.Column(db.String(255))
+    bytes_in = db.Column(db.BigInteger) # Using BigInteger for byte counts
+    bytes_out = db.Column(db.BigInteger)
+    uptime_seconds = db.Column(db.Integer) # Store uptime in seconds for easier calculation
+
+    def __repr__(self):
+        return f'<UserActivityLog {self.username} @ {self.timestamp}>'
+
+class SystemSnapshot(db.Model):
+    __tablename__ = 'system_snapshot'
+    id = db.Column(db.Integer, primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    active_users_count = db.Column(db.Integer)
+    total_data_bytes_in = db.Column(db.BigInteger) # Aggregated from all users at snapshot time
+    total_data_bytes_out = db.Column(db.BigInteger)
+
+    def __repr__(self):
+        return f'<SystemSnapshot @ {self.timestamp} - Active Users: {self.active_users_count}>'
 
 
 # --- User Class for Flask-Login ---
@@ -1035,6 +1078,138 @@ class RouterOSService:
             
         return True, message, deleted_count
 
+    def get_historical_total_usage_over_time(self, start_date_str: str, end_date_str: str, interval: str = 'daily') -> list:
+        """
+        Aggregates total data usage (in and out) from SystemSnapshot over a specified period,
+        grouped by day, week, or month.
+        """
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1) # Include the whole end day
+        except ValueError:
+            logger.error("Invalid date format for historical usage. Use YYYY-MM-DD.")
+            return []
+
+        query = db.session.query(
+            SystemSnapshot.timestamp,
+            func.sum(SystemSnapshot.total_data_bytes_in).label('total_in'),
+            func.sum(SystemSnapshot.total_data_bytes_out).label('total_out')
+        ).filter(
+            SystemSnapshot.timestamp >= start_date,
+            SystemSnapshot.timestamp < end_date
+        )
+
+        if interval == 'daily':
+            query = query.group_by(cast(SystemSnapshot.timestamp, Date))
+        elif interval == 'weekly':
+            # Group by year and week number
+            query = query.group_by(extract('year', SystemSnapshot.timestamp), extract('week', SystemSnapshot.timestamp))
+        elif interval == 'monthly':
+            # Group by year and month number
+            query = query.group_by(extract('year', SystemSnapshot.timestamp), extract('month', SystemSnapshot.timestamp))
+        else:
+            logger.warning(f"Unsupported interval: {interval}. Defaulting to daily.")
+            query = query.group_by(cast(SystemSnapshot.timestamp, Date))
+            interval = 'daily' # For correct date formatting later
+
+        query = query.order_by(SystemSnapshot.timestamp)
+
+        results = []
+        for row in query.all():
+            # Format timestamp based on interval for consistent output
+            ts_obj = row.timestamp # This is the first timestamp in the group
+            if interval == 'daily':
+                formatted_ts = ts_obj.strftime('%Y-%m-%d')
+            elif interval == 'weekly':
+                # For weekly, use the date of the start of that week (Monday)
+                start_of_week = ts_obj - timedelta(days=ts_obj.weekday())
+                formatted_ts = start_of_week.strftime('%Y-%m-%d (Week %W)')
+            elif interval == 'monthly':
+                formatted_ts = ts_obj.strftime('%Y-%m')
+
+            results.append({
+                'timestamp': formatted_ts,
+                'total_bytes_in': row.total_in or 0,
+                'total_bytes_out': row.total_out or 0
+            })
+        return results
+
+    def get_historical_peak_concurrent_users_over_time(self, start_date_str: str, end_date_str: str, interval: str = 'daily') -> list:
+        """
+        Finds the peak number of concurrent users from SystemSnapshot over a specified period,
+        grouped by day, week, or month.
+        """
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1)
+        except ValueError:
+            logger.error("Invalid date format for peak concurrent users. Use YYYY-MM-DD.")
+            return []
+
+        query = db.session.query(
+            SystemSnapshot.timestamp,
+            func.max(SystemSnapshot.active_users_count).label('peak_users')
+        ).filter(
+            SystemSnapshot.timestamp >= start_date,
+            SystemSnapshot.timestamp < end_date
+        )
+
+        if interval == 'daily':
+            query = query.group_by(cast(SystemSnapshot.timestamp, Date))
+        elif interval == 'weekly':
+            query = query.group_by(extract('year', SystemSnapshot.timestamp), extract('week', SystemSnapshot.timestamp))
+        elif interval == 'monthly':
+            query = query.group_by(extract('year', SystemSnapshot.timestamp), extract('month', SystemSnapshot.timestamp))
+        else: # Default to daily
+            query = query.group_by(cast(SystemSnapshot.timestamp, Date))
+            interval = 'daily'
+
+        query = query.order_by(SystemSnapshot.timestamp)
+
+        results = []
+        for row in query.all():
+            ts_obj = row.timestamp
+            if interval == 'daily':
+                formatted_ts = ts_obj.strftime('%Y-%m-%d')
+            elif interval == 'weekly':
+                start_of_week = ts_obj - timedelta(days=ts_obj.weekday())
+                formatted_ts = start_of_week.strftime('%Y-%m-%d (Week %W)')
+            elif interval == 'monthly':
+                formatted_ts = ts_obj.strftime('%Y-%m')
+
+            results.append({
+                'timestamp': formatted_ts,
+                'peak_users': row.peak_users or 0
+            })
+        return results
+
+    def get_user_activity_history(self, username: str, start_date_str: str, end_date_str: str) -> list:
+        """
+        Retrieves activity (data usage, uptime) for a specific user over a period.
+        This returns all snapshots for the user, frontend might need to aggregate/process.
+        """
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d') + timedelta(days=1)
+        except ValueError:
+            logger.error("Invalid date format for user activity history. Use YYYY-MM-DD.")
+            return []
+
+        logs = UserActivityLog.query.filter(
+            UserActivityLog.username == username,
+            UserActivityLog.timestamp >= start_date,
+            UserActivityLog.timestamp < end_date
+        ).order_by(UserActivityLog.timestamp).all()
+
+        return [{
+            'timestamp': log.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'profile': log.profile,
+            'bytes_in': log.bytes_in,
+            'bytes_out': log.bytes_out,
+            'uptime_seconds': log.uptime_seconds
+        } for log in logs]
+
+
 router_os_service = RouterOSService()
 
 # --- Helper Functions ---
@@ -1510,6 +1685,58 @@ def get_basic_analytics_summary_route():
         logger.error(f"API: Error fetching basic analytics: {str(e)}")
         return jsonify({'success': False, 'message': _('A server error occurred while fetching analytics: {error}').format(error=str(e))}), 500
 
+# --- Historical Analytics API Endpoints ---
+@app.route('/api/analytics/historical_usage', methods=['GET'])
+@login_required
+def get_historical_usage_route():
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    interval = request.args.get('interval', 'daily') # daily, weekly, monthly
+
+    if not start_date or not end_date:
+        return jsonify({'success': False, 'message': 'start_date and end_date parameters are required.'}), 400
+
+    try:
+        data = router_os_service.get_historical_total_usage_over_time(start_date, end_date, interval)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        logger.error(f"API: Error fetching historical usage: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': _('A server error occurred while fetching historical usage data.')}), 500
+
+@app.route('/api/analytics/historical_peak_users', methods=['GET'])
+@login_required
+def get_historical_peak_users_route():
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    interval = request.args.get('interval', 'daily')
+
+    if not start_date or not end_date:
+        return jsonify({'success': False, 'message': 'start_date and end_date parameters are required.'}), 400
+
+    try:
+        data = router_os_service.get_historical_peak_concurrent_users_over_time(start_date, end_date, interval)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        logger.error(f"API: Error fetching historical peak users: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': _('A server error occurred while fetching historical peak users data.')}), 500
+
+@app.route('/api/analytics/user_activity_history/<username>', methods=['GET'])
+@login_required
+def get_user_activity_history_route(username):
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+
+    if not start_date or not end_date:
+        return jsonify({'success': False, 'message': 'start_date and end_date parameters are required.'}), 400
+
+    try:
+        data = router_os_service.get_user_activity_history(username, start_date, end_date)
+        return jsonify({'success': True, 'data': data})
+    except Exception as e:
+        logger.error(f"API: Error fetching user activity history for {username}: {e}", exc_info=True)
+        return jsonify({'success': False, 'message': _('A server error occurred while fetching user activity history.')}), 500
+
+
 @app.route('/api/translations')
 # This route is called by login.html, so it should be accessible without app login.
 # Mikrotik connection is not needed for translations.
@@ -1630,4 +1857,116 @@ if __name__ == '__main__':
     print(_("  Mikrotik Hotspot Management System v2"))
     print("="*40)
     print(f"\n✅ {_('Dashboard available at:')} http://{server_config['host']}:{server_config['port']}")
+
+    with app.app_context():
+        db.create_all()
+        logger.info("Database tables created (if they didn't exist).")
+
+    # --- Scheduler Setup ---
+    def log_router_data_job():
+        """Scheduled job to log data from the Mikrotik router."""
+        with app.app_context(): # Ensure app context for db and config access
+            logger.info("Scheduler: Running log_router_data_job...")
+            try:
+                # Check if Mikrotik API is available (similar to how it's done in routes)
+                # This requires a request context for 'g', so we use a direct service call pattern
+                # or ensure the service method itself can acquire the API if not in 'g'.
+                # For simplicity, let's assume router_os_service methods can be called.
+                # If they rely on 'g', this job would need to simulate parts of a request context
+                # or the service methods need refactoring.
+                # Assuming router_os_service.get_hotspot_users() and get_active_sessions()
+                # can establish their own connection if needed, or we pass the app explicitly.
+
+                # Re-instantiate RouterOSService or ensure it can work outside request context
+                # For this job, it's better if RouterOSService can be instantiated and used directly.
+                # Let's assume its methods like get_hotspot_users correctly use get_mikrotik_api(),
+                # which in turn might need app context if 'g' is not available.
+                # Since we are in app_context(), get_mikrotik_api() *should* work.
+
+                # Ensure Mikrotik API is available (mimicking get_mikrotik_api without 'g')
+                current_config = config_loader.get_config()
+                mikrotik_cfg = current_config['mikrotik']
+                temp_api = None
+                try:
+                    temp_api = librouteros.connect(
+                        host=mikrotik_cfg['host'],
+                        username=mikrotik_cfg['username'],
+                        password=mikrotik_cfg['password'],
+                        port=mikrotik_cfg['port'],
+                        ssl=mikrotik_cfg.get('use_ssl', False)
+                    )
+                    logger.info("Scheduler: Successfully connected to Mikrotik for data logging.")
+                except Exception as api_conn_e:
+                    logger.error(f"Scheduler: Failed to connect to Mikrotik for data logging: {api_conn_e}")
+                    return # Exit job if no connection
+
+                # --- Fetch Data using the temporary API connection ---
+                try:
+                    users_raw = list(temp_api.path('ip', 'hotspot', 'user').select(
+                        '.id', 'name', 'profile', 'uptime', 'bytes-in', 'bytes-out'
+                    ))
+                    active_sessions_raw = list(temp_api.path('ip', 'hotspot', 'active').select('.id'))
+                except Exception as fetch_e:
+                    logger.error(f"Scheduler: Error fetching data from Mikrotik: {fetch_e}")
+                    if temp_api: temp_api.close()
+                    return
+                finally:
+                    if temp_api: temp_api.close()
+
+
+                current_time = datetime.utcnow()
+                total_bytes_in_snapshot = 0
+                total_bytes_out_snapshot = 0
+
+                for user_data_raw in users_raw:
+                    try:
+                        uptime_str = user_data_raw.get('uptime', '0s')
+                        uptime_sec = router_os_service._parse_ros_time(uptime_str) # Use existing parser
+
+                        bytes_in_val = int(user_data_raw.get('bytes-in', 0) or 0)
+                        bytes_out_val = int(user_data_raw.get('bytes-out', 0) or 0)
+
+                        log_entry = UserActivityLog(
+                            timestamp=current_time,
+                            username=user_data_raw.get('name'),
+                            profile=user_data_raw.get('profile'),
+                            bytes_in=bytes_in_val,
+                            bytes_out=bytes_out_val,
+                            uptime_seconds=uptime_sec
+                        )
+                        db.session.add(log_entry)
+
+                        total_bytes_in_snapshot += bytes_in_val
+                        total_bytes_out_snapshot += bytes_out_val
+                    except Exception as e_user:
+                        logger.error(f"Scheduler: Error processing user {user_data_raw.get('name', 'N/A')} for logging: {e_user}")
+
+                snapshot_entry = SystemSnapshot(
+                    timestamp=current_time,
+                    active_users_count=len(active_sessions_raw),
+                    total_data_bytes_in=total_bytes_in_snapshot,
+                    total_data_bytes_out=total_bytes_out_snapshot
+                )
+                db.session.add(snapshot_entry)
+
+                db.session.commit()
+                logger.info(f"Scheduler: Successfully logged data for {len(users_raw)} users and system snapshot.")
+
+            except Exception as e:
+                logger.error(f"Scheduler: Unhandled exception in log_router_data_job: {e}", exc_info=True)
+                db.session.rollback()
+
+
+    scheduler_config = app_config.get('scheduler', {})
+    if scheduler_config.get('enabled', False) and (os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not app.debug):
+        scheduler = BackgroundScheduler(daemon=True)
+        job_interval_minutes = scheduler_config.get('job_interval_minutes', 60)
+        scheduler.add_job(log_router_data_job, 'interval', minutes=job_interval_minutes)
+        scheduler.start()
+        logger.info(f"Scheduler started. Logging data every {job_interval_minutes} minutes.")
+    elif not scheduler_config.get('enabled', False):
+        logger.info("Scheduler is disabled in configuration.")
+    else:
+        logger.info("Scheduler not started (app in debug/reloader mode or WERKZEUG_RUN_MAIN not true).")
+
     app.run(host=server_config['host'], port=server_config['port'], debug=server_config['debug'])

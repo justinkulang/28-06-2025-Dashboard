@@ -9,7 +9,11 @@ This project provides a web-based dashboard for managing Mikrotik Hotspot users,
 *   **Profile Management:** Manage hotspot user profiles from the Mikrotik router.
 *   **Active Sessions:** View and disconnect active hotspot users.
 *   **Voucher Generation:** Export user batches as printable HTML or PDF vouchers with QR codes.
-*   **Analytics:** Basic analytics on data usage by profile and top users.
+*   **Live Analytics:** Real-time dashboard showing current data usage by profile and top users.
+*   **Historical Analytics:**
+    *   Logs user activity and system snapshots (e.g., data usage, active user counts) over time to a local SQLite database (`hotspot_analytics.db`).
+    *   Provides charts for total data usage and peak concurrent users over selectable time periods (daily, weekly, monthly).
+    *   Data logging is managed by a background scheduler, configurable via `config.json`.
 *   **Secure Access:**
     *   Web application login system using Flask-Login (session-based).
     *   CSRF protection for all state-changing operations using Flask-WTF.
@@ -43,10 +47,10 @@ This project provides a web-based dashboard for managing Mikrotik Hotspot users,
     ```bash
     pip install -r requirements.txt
     ```
-    The `requirements.txt` file contains pinned versions for stable builds. You can update these or generate your own environment's specific versions using `pip freeze > requirements.txt` after testing.
+    The `requirements.txt` file includes all necessary dependencies, including `Flask-SQLAlchemy` for database operations and `APScheduler` for background data logging. Pinned versions are used for stable builds. You can update these or generate your own environment's specific versions using `pip freeze > requirements.txt` after testing.
 
 4.  **Initial Configuration (`config.json`):**
-    *   Upon first run, or if `config.json` is missing, a default configuration file will be created.
+    *   Upon first run, or if `config.json` is missing, a default configuration file will be created. This file includes settings for the Mikrotik connection, web server, admin user, database, and data logging scheduler.
     *   **Web Application Admin:**
         *   A default admin user for the web dashboard is created with credentials:
             *   Username: `admin`
@@ -62,7 +66,15 @@ This project provides a web-based dashboard for managing Mikrotik Hotspot users,
         *   Configure your Mikrotik router details (host, API username, API password, port) either by:
             1.  Manually editing `config.json` before the first run.
             2.  Using the web application's "Settings" page after logging in with the default admin credentials. The application will not be able to manage the router until these details are correctly configured.
-    *   **Log File Location:** The default log file is `mikrotik_dashboard.log`. You can change this in `config.json` under `server.log_file`.
+    *   **Database Configuration:**
+        *   The application uses an SQLite database (`hotspot_analytics.db` by default, created in the application's root directory) to store historical analytics data.
+        *   The database URI can be changed in `config.json` under the `database.uri` key if needed (e.g., to specify a different file path or use another SQLAlchemy-compatible database).
+    *   **Scheduler Configuration:**
+        *   A background scheduler logs data periodically for historical analytics.
+        *   Settings are in `config.json` under the `scheduler` section:
+            *   `enabled` (boolean): `true` to enable data logging, `false` to disable.
+            *   `job_interval_minutes` (integer): How often (in minutes) the data logging job runs. Default is 60 minutes.
+    *   **Log File Location:** The default application log file is `mikrotik_dashboard.log`. You can change this in `config.json` under `server.log_file`.
 
 ## Running the Application
 
