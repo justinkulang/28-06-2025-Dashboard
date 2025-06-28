@@ -9,7 +9,14 @@ This project provides a web-based dashboard for managing Mikrotik Hotspot users,
 *   **Profile Management:** Manage hotspot user profiles from the Mikrotik router.
 *   **Active Sessions:** View and disconnect active hotspot users.
 *   **Voucher Generation:** Export user batches as printable HTML or PDF vouchers with QR codes.
-*   **Analytics:** Basic analytics on data usage by profile and top users.
+*   **Analytics:**
+    *   Dashboard summary of total users and active sessions.
+    *   Dedicated analytics page with:
+        *   Total data transferred by all users.
+        *   Pie chart: Data usage by user profile.
+        *   Bar chart: Top 10 users by data usage.
+        *   Pie chart: User count by user profile.
+        *   Tabular views for profile data usage and top user data.
 *   **Secure Access:**
     *   Web application login system using Flask-Login (session-based).
     *   CSRF protection for all state-changing operations using Flask-WTF.
