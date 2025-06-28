@@ -13,6 +13,7 @@ This project provides a web-based dashboard for managing Mikrotik Hotspot users,
 *   **Secure Access:**
     *   Web application login system using Flask-Login (session-based).
     *   CSRF protection for all state-changing operations using Flask-WTF.
+    *   Enhanced backend input validation for API endpoints.
 *   **Internationalization (i18n):** Support for multiple languages (English, Arabic, French).
 *   **Configurable:** Key settings managed via `config.json`.
 *   **Production Ready:** Includes Gunicorn configuration and guidance for HTTPS setup.
@@ -50,19 +51,19 @@ This project provides a web-based dashboard for managing Mikrotik Hotspot users,
     *   **Web Application Admin:**
         *   A default admin user for the web dashboard is created with credentials:
             *   Username: `admin`
-            *   Password: `changeme`
-        *   **IMPORTANT:** Change this default password immediately after the first login! You can generate a new password hash using Python and Werkzeug security:
-            ```python
-            from werkzeug.security import generate_password_hash
-            new_hash = generate_password_hash('your_new_strong_password')
-            print(new_hash)
+            *   Password: `changeme` (this is the initial password for the default hash).
+        *   **IMPORTANT:** Change this default password immediately after the first login using the "Change Admin Password" feature in the "Settings" tab of the dashboard.
+        *   The application uses `werkzeug.security` for password hashing. If you ever need to reset the password manually (e.g., if you're locked out and cannot use the UI), you would need to generate a new password hash and update the `password_hash` value in the `app_admin` section of `config.json`. You can use the provided `passwordg_generator.py` script for this:
+            ```bash
+            python passwordg_generator.py
             ```
-            Then, update the `password_hash` value in the `app_admin` section of `config.json` with this new hash.
+            This script will prompt you to enter a new password and will output the corresponding hash to replace in `config.json`.
     *   **Mikrotik Connection:**
         *   Configure your Mikrotik router details (host, API username, API password, port) either by:
             1.  Manually editing `config.json` before the first run.
             2.  Using the web application's "Settings" page after logging in with the default admin credentials. The application will not be able to manage the router until these details are correctly configured.
     *   **Log File Location:** The default log file is `mikrotik_dashboard.log`. You can change this in `config.json` under `server.log_file`.
+    *   **Permissions:** Ensure `config.json` has restrictive file permissions (e.g., readable only by the user running the application server) as it contains sensitive Mikrotik credentials. For example, on Linux/macOS: `chmod 600 config.json`.
 
 ## Running the Application
 
@@ -192,5 +193,36 @@ This application uses Flask-Babel for internationalization.
     4.  Compile translations: `pybabel compile -d translations`
     (Ensure you have Babel installed and `babel.cfg` correctly configured if you modify translatable files.)
 
+**Note on Translation Management:**
+For improved long-term maintainability, especially as the number of translatable strings grows, consider the following:
+*   The primary list of translatable strings for the JavaScript frontend is currently defined within `app.py` in the `/api/translations` route. While functional, a more standard approach would be to have these strings directly in the JavaScript or HTML, allowing `pybabel extract` to find them (requires proper configuration in `babel.cfg` for JavaScript extraction).
+*   Alternatively, if keeping them centralized in Python, ensure all new user-facing strings added to the JavaScript frontend are also added to the `translations` dictionary in `app.py` and wrapped with `_()` there.
+
 *(License section would go here if applicable)*
 *(Contributing guidelines would go here if applicable)*
+
+## Automated Testing (Recommended)
+
+To ensure the long-term stability, maintainability, and reliability of this application, implementing automated tests is highly recommended. Automated tests can catch regressions early, make refactoring safer, and provide confidence when adding new features.
+
+Consider the following types of tests:
+
+*   **Backend Unit Tests (e.g., using `pytest`):**
+    *   Test individual functions and class methods in `app.py`, especially within the `RouterOSService` to mock Mikrotik API interactions and verify logic for user/profile management, data parsing, and error handling.
+    *   Test Flask route handlers for correct responses, status codes, and basic input validation logic (though much of this is now more robust).
+    *   Test the `ConfigLoader` class for loading and updating configurations.
+
+*   **Backend Integration Tests:**
+    *   Test the interaction between different components, such as a route handler calling a service method that interacts with a (mocked) Mikrotik API.
+
+*   **Frontend Unit Tests (e.g., using Jest, Vitest):**
+    *   Test individual JavaScript functions in `static/js/dashboard.js` for DOM manipulation logic, data formatting, and simple UI interactions.
+
+*   **Frontend End-to-End (E2E) Tests (e.g., using Cypress, Playwright):**
+    *   Simulate user interactions in a real browser environment to test complete user flows, such as logging in, creating a user, viewing sessions, and exporting data.
+
+**Benefits of Automated Testing:**
+*   **Early Bug Detection:** Catch issues before they reach users.
+*   **Safer Refactoring:** Make changes to the codebase with more confidence.
+*   **Improved Code Quality:** Writing testable code often leads to better design.
+*   **Living Documentation:** Tests can serve as examples of how the code is intended to be used.

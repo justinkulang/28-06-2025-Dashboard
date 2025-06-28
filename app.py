@@ -576,7 +576,7 @@ def view_batch_vouchers_html():
 def download_batch_vouchers_pdf():
     if not WEASYPRINT_AVAILABLE:
         logger.warning("PDF export attempted but WeasyPrint is not available.")
-        return jsonify({'success': False, 'message': 'PDF generation library not available on the server.'}), 501
+        return jsonify({'success': False, 'message': _('PDF generation library not available on the server.')}), 501
 
     try:
         vouchers_json = request.form.get('vouchers_json', '[]')
@@ -584,7 +584,7 @@ def download_batch_vouchers_pdf():
         vouchers = json.loads(vouchers_json)
 
         if not vouchers:
-            return jsonify({'success': False, 'message': 'No voucher data provided.'}), 400
+            return jsonify({'success': False, 'message': _('No voucher data provided.')}), 400
         
         # Generate HTML without the print button for PDF rendering
         html_content = _generate_vouchers_page_html(vouchers, hotspot_login_url, include_print_button=False)
@@ -598,14 +598,14 @@ def download_batch_vouchers_pdf():
         )
     except json.JSONDecodeError:
         logger.error("Failed to decode vouchers_json for PDF export.")
-        return jsonify({'success': False, 'message': 'Invalid voucher data provided for PDF export.'}), 400
+        return jsonify({'success': False, 'message': _('Invalid voucher data provided for PDF export.')}), 400
     except Exception as e:
         logger.error(f"Error generating voucher PDF: {e}")
         # Check if it's a WeasyPrint specific error that might hint at system dependencies
         if "No X11 connection" in str(e) or "GTK" in str(e):
              logger.error("WeasyPrint PDF generation failed, possibly due to missing X11/GTK dependencies on the server.")
-             return jsonify({'success': False, 'message': 'PDF generation failed on server due to missing dependencies. Please check server logs.'}), 500
-        return jsonify({'success': False, 'message': f'An unexpected error occurred during PDF generation: {str(e)}'}), 500
+             return jsonify({'success': False, 'message': _('PDF generation failed on server due to missing dependencies. Please check server logs.')}), 500
+        return jsonify({'success': False, 'message': _('An unexpected error occurred during PDF generation: {error}').format(error=str(e))}), 500
 
 def get_mikrotik_api():
     """Establishes and returns a single Mikrotik API connection per request."""
@@ -687,20 +687,20 @@ class RouterOSService:
         try:
             api = get_mikrotik_api()
             if api is None:
-                return False, "Connection failed: Could not establish API session. Check config and router status."
+                return False, _("Connection failed: Could not establish API session. Check config and router status.")
             identity_records = list(api.path('system', 'identity').select('name'))
 
-            router_name = 'Mikrotik Router'
+            router_name = 'Mikrotik Router' # This is a default, not directly user-facing if identity is found
             if identity_records:
                 router_name = identity_records[0].get('name', 'Mikrotik Router')
 
-            return True, f"Connected successfully to {router_name}"
+            return True, _("Connected successfully to {router_name}").format(router_name=router_name)
         except ConnectionError as e:
             logger.error(f"Connection test failed: {e}")
-            return False, f"Connection failed: {e}"
+            return False, _("Connection failed: {error}").format(error=str(e))
         except Exception as e:
             logger.error(f"Unexpected error during connection test: {str(e)}")
-            return False, f"Unexpected error during connection test: {str(e)}"
+            return False, _("Unexpected error during connection test: {error}").format(error=str(e))
 
     def get_hotspot_users(self) -> list:
         """Get all hotspot users."""
@@ -723,48 +723,48 @@ class RouterOSService:
         try:
             api = get_mikrotik_api()
             if api is None:
-                return False, "Mikrotik connection not available"
+                return False, _("Mikrotik connection not available")
             # Clean up potential None values before sending to router
             valid_user_data = {k: v for k, v in user_data.items() if v is not None}
             api.path('ip', 'hotspot', 'user').add(**valid_user_data)
-            return True, "User created successfully"
+            return True, _("User created successfully")
         except (TrapError, Exception) as e:
             logger.error(f"Error creating user: {str(e)}")
-            return False, f"Mikrotik Error: {str(e)}"
+            return False, _("Mikrotik Error: {error}").format(error=str(e))
 
     def edit_hotspot_user(self, username: str, new_data: dict) -> tuple[bool, str]:
         """Edit existing hotspot user."""
         try:
             api = get_mikrotik_api()
             if api is None:
-                return False, "Mikrotik connection not available"
+                return False, _("Mikrotik connection not available")
             users = list(api.path('ip', 'hotspot', 'user').select('.id').where(name=username))
             if not users:
-                return False, "User not found"
+                return False, _("User not found")
             
             user_id = users[0]['.id']
             api.path('ip', 'hotspot', 'user').set(**new_data, **{'.id': user_id})
-            return True, "User updated successfully"
+            return True, _("User updated successfully")
         except (TrapError, Exception) as e:
             logger.error(f"Error editing user '{username}': {str(e)}")
-            return False, f"Mikrotik Error: {str(e)}"
+            return False, _("Mikrotik Error: {error}").format(error=str(e))
 
     def delete_hotspot_user(self, username: str) -> tuple[bool, str]:
         """Delete hotspot user."""
         try:
             api = get_mikrotik_api()
             if api is None:
-                return False, "Mikrotik connection not available"
+                return False, _("Mikrotik connection not available")
             users = list(api.path('ip', 'hotspot', 'user').select('.id').where(name=username))
             if not users:
-                return False, "User not found"
+                return False, _("User not found")
 
             user_id = users[0]['.id']
             api.path('ip', 'hotspot', 'user').remove(user_id)
-            return True, "User deleted successfully"
+            return True, _("User deleted successfully")
         except (TrapError, Exception) as e:
             logger.error(f"Error deleting user '{username}': {str(e)}")
-            return False, f"Mikrotik Error: {str(e)}"
+            return False, _("Mikrotik Error: {error}").format(error=str(e))
     
     def get_active_sessions(self) -> list:
         """Get active hotspot sessions."""
@@ -787,12 +787,12 @@ class RouterOSService:
         try:
             api = get_mikrotik_api()
             if api is None:
-                return False, "Mikrotik connection not available"
+                return False, _("Mikrotik connection not available")
             api.path('ip', 'hotspot', 'active').remove(active_id)
-            return True, "User disconnected successfully"
+            return True, _("User disconnected successfully")
         except (TrapError, Exception) as e:
             logger.error(f"Error disconnecting user: {str(e)}")
-            return False, f"Mikrotik Error: {str(e)}"
+            return False, _("Mikrotik Error: {error}").format(error=str(e))
 
     def get_user_profiles(self) -> list:
         """Get hotspot user profiles."""
@@ -815,37 +815,37 @@ class RouterOSService:
         try:
             api = get_mikrotik_api()
             if api is None:
-                return False, "Mikrotik connection not available"
+                return False, _("Mikrotik connection not available")
             data_to_add = {k: v for k, v in profile_data.items() if v}
             api.path('ip', 'hotspot', 'user', 'profile').add(**data_to_add)
-            return True, f"Profile '{profile_data['name']}' created successfully."
+            return True, _("Profile '{profile_name}' created successfully.").format(profile_name=profile_data['name'])
         except (TrapError, Exception) as e:
             logger.error(f"Error creating profile: {str(e)}")
-            return False, f"Mikrotik Error: {str(e)}"
+            return False, _("Mikrotik Error: {error}").format(error=str(e))
 
     def edit_hotspot_profile(self, profile_id: str, new_data: dict) -> tuple[bool, str]:
         """Edits an existing hotspot user profile."""
         try:
             api = get_mikrotik_api()
             if api is None:
-                return False, "Mikrotik connection not available"
+                return False, _("Mikrotik connection not available")
             api.path('ip', 'hotspot', 'user', 'profile').set(**new_data, **{'.id': profile_id})
-            return True, "Profile updated successfully."
+            return True, _("Profile updated successfully.")
         except (TrapError, Exception) as e:
             logger.error(f"Error editing profile: {str(e)}")
-            return False, f"Mikrotik Error: {str(e)}"
+            return False, _("Mikrotik Error: {error}").format(error=str(e))
 
     def delete_hotspot_profile(self, profile_id: str) -> tuple[bool, str]:
         """Deletes a hotspot user profile."""
         try:
             api = get_mikrotik_api()
             if api is None:
-                return False, "Mikrotik connection not available"
+                return False, _("Mikrotik connection not available")
             api.path('ip', 'hotspot', 'user', 'profile').remove(profile_id)
-            return True, "Profile deleted successfully."
+            return True, _("Profile deleted successfully.")
         except (TrapError, Exception) as e:
             logger.error(f"Error deleting profile: {str(e)}")
-            return False, f"Mikrotik Error: {str(e)}"
+            return False, _("Mikrotik Error: {error}").format(error=str(e))
     
     def _parse_ros_time(self, time_str: str) -> int:
         """Parses RouterOS time string (e.g., 1w2d3h4m5s) into seconds."""
@@ -867,14 +867,14 @@ class RouterOSService:
         try:
             api = get_mikrotik_api()
             if api is None: # Check if API connection failed initially
-                return False, "Mikrotik connection not available", 0
+                return False, _("Mikrotik connection not available"), 0
             
             users = self.get_hotspot_users() 
             # get_hotspot_users itself will return [] if api was None, so this is safe.
             # However, if api was None for this call but not for the initial api check,
             # we might want to re-check. But the current pattern is one api per request.
             if not users and api is None: # If users list is empty because api became None
-                 return False, "Mikrotik connection not available (users fetch failed)", 0
+                 return False, _("Mikrotik connection not available (users fetch failed)"), 0
 
             deleted_count = 0
             errors = []
@@ -904,14 +904,17 @@ class RouterOSService:
                         errors.append(user['name'])
                         logger.error(f"Failed to delete expired user '{user['name']}': {e}")
             
-            message = f"Successfully deleted {deleted_count} expired user(s)."
+            base_message = _("Successfully deleted {count} expired user(s).").format(count=deleted_count)
             if errors:
-                message += f" Failed to delete: {', '.join(errors)}."
+                error_list = ", ".join(errors)
+                message = base_message + " " + _("Failed to delete: {users}.").format(users=error_list)
+            else:
+                message = base_message
             
             return True, message, deleted_count
         except Exception as e:
             logger.error(f"Error during expired user cleanup: {str(e)}")
-            return False, f"An unexpected error occurred: {str(e)}", 0
+            return False, _("An unexpected error occurred: {error}").format(error=str(e)), 0
 
     def get_basic_bandwidth_analytics(self) -> dict:
         """Calculates basic bandwidth analytics from hotspot user data."""
@@ -967,11 +970,11 @@ class RouterOSService:
         """Deletes hotspot users belonging to a specific profile."""
         api = get_mikrotik_api()
         if api is None:
-            return False, "Mikrotik connection not available", 0
+            return False, _("Mikrotik connection not available"), 0
 
         users = self.get_hotspot_users()
         if not users and get_mikrotik_api() is None: # Re-check API status if user list is empty
-            return False, "Mikrotik connection not available (users fetch failed)", 0
+            return False, _("Mikrotik connection not available (users fetch failed)"), 0
 
         deleted_count = 0
         failed_count = 0
@@ -982,7 +985,7 @@ class RouterOSService:
                 users_to_delete_ids.append(user['.id'])
 
         if not users_to_delete_ids:
-            return True, f"No users found for profile '{profile_name}'. Nothing to delete.", 0
+            return True, _("No users found for profile '{profile_name}'. Nothing to delete.").format(profile_name=profile_name), 0
 
         for user_id in users_to_delete_ids:
             try:
@@ -992,9 +995,9 @@ class RouterOSService:
                 logger.error(f"Failed to delete user with ID '{user_id}' from profile '{profile_name}': {e}")
                 failed_count += 1
         
-        message = f"Successfully deleted {deleted_count} user(s) from profile '{profile_name}'."
+        message = _("Successfully deleted {deleted_count} user(s) from profile '{profile_name}'.").format(deleted_count=deleted_count, profile_name=profile_name)
         if failed_count > 0:
-            message += f" Failed to delete {failed_count} user(s)."
+            message += " " + _("Failed to delete {failed_count} user(s).").format(failed_count=failed_count)
         
         return True, message, deleted_count
 
@@ -1002,11 +1005,11 @@ class RouterOSService:
         """Deletes hotspot users based on their active (enabled/disabled) status."""
         api = get_mikrotik_api()
         if api is None:
-            return False, "Mikrotik connection not available", 0
+            return False, _("Mikrotik connection not available"), 0
 
         users = self.get_hotspot_users()
         if not users and get_mikrotik_api() is None: # Re-check API status if user list is empty
-            return False, "Mikrotik connection not available (users fetch failed)", 0
+            return False, _("Mikrotik connection not available (users fetch failed)"), 0
 
         deleted_count = 0
         failed_count = 0
@@ -1017,9 +1020,9 @@ class RouterOSService:
             if user.get('disabled') == target_status_str:
                 users_to_delete_ids.append(user['.id'])
         
-        status_desc = "disabled" if is_disabled else "active (enabled)"
+        status_desc = _("disabled") if is_disabled else _("active (enabled)")
         if not users_to_delete_ids:
-            return True, f"No {status_desc} users found. Nothing to delete.", 0
+            return True, _("No {status_description} users found. Nothing to delete.").format(status_description=status_desc), 0
 
         for user_id in users_to_delete_ids:
             try:
@@ -1029,9 +1032,9 @@ class RouterOSService:
                 logger.error(f"Failed to delete user with ID '{user_id}' (status: {status_desc}): {e}")
                 failed_count += 1
         
-        message = f"Successfully deleted {deleted_count} {status_desc} user(s)."
+        message = _("Successfully deleted {deleted_count} {status_description} user(s).").format(deleted_count=deleted_count, status_description=status_desc)
         if failed_count > 0:
-            message += f" Failed to delete {failed_count} user(s)."
+            message += " " + _("Failed to delete {failed_count} user(s).").format(failed_count=failed_count)
             
         return True, message, deleted_count
 
@@ -1134,19 +1137,25 @@ def initial_connect():
     global app_config # Ensure we're updating the global app_config
     data = request.json
     host = data.get('host')
-    port = data.get('port')
+    port_str = data.get('port') # Keep original port as string for int conversion check
     username = data.get('username')
     password = data.get('password') # Password can be empty
 
-    if not all([host, port is not None, username is not None]): # port can be 0, username can be empty string
-        return jsonify({'success': False, 'message': 'Host, Port, and Username are required.'}), 400
+    if not host or not isinstance(host, str):
+        return jsonify({'success': False, 'message': _('Host must be a non-empty string.')}), 400
+    if port_str is None: # Check if port is provided
+        return jsonify({'success': False, 'message': _('Port is required.')}), 400
+    if not username or not isinstance(username, str):
+        return jsonify({'success': False, 'message': _('Username must be a non-empty string.')}), 400
+    if password is not None and not isinstance(password, str):
+        return jsonify({'success': False, 'message': _('Password must be a string if provided.')}), 400
 
     try:
-        port = int(port)
-        if not (0 <= port <= 65535): # Port 0 is technically valid for OS to pick one
+        port = int(port_str)
+        if not (0 <= port <= 65535):
             raise ValueError("Invalid port number")
-    except ValueError:
-        return jsonify({'success': False, 'message': 'Invalid port number. Must be between 0 and 65535.'}), 400
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': _('Invalid port number. Must be an integer between 0 and 65535.')}), 400
 
     logger.info(f"Attempting initial connection to Mikrotik: {host}:{port} with user: {username}")
     try:
@@ -1173,20 +1182,20 @@ def initial_connect():
         config_loader.update_config({'mikrotik': new_mikrotik_config})
         app_config = config_loader.get_config() # Reload app_config to reflect changes
 
-        return jsonify({'success': True, 'message': 'Successfully connected and configuration saved.'})
+        return jsonify({'success': True, 'message': _('Successfully connected and configuration saved.')})
 
     except (librouteros.exceptions.LibRouterosError, TrapError, socket.error, ConnectionRefusedError, OSError) as e:
         logger.error(f"Initial connection failed: {e}")
         # Sanitize error message for user
         error_message = str(e)
         if "authentication failed" in error_message.lower():
-            return jsonify({'success': False, 'message': 'Authentication failed. Please check username and password.'}), 401
+            return jsonify({'success': False, 'message': _('Authentication failed. Please check username and password.')}), 401
         elif "connection refused" in error_message.lower() or "timed out" in error_message.lower() or "no route to host" in error_message.lower():
-            return jsonify({'success': False, 'message': 'Connection refused or timed out. Check IP address, port, and router firewall.'}), 400
-        return jsonify({'success': False, 'message': f'Connection failed: {e}.'}), 400
+            return jsonify({'success': False, 'message': _('Connection refused or timed out. Check IP address, port, and router firewall.')}), 400
+        return jsonify({'success': False, 'message': _('Connection failed: {error}').format(error=str(e))}), 400
     except Exception as e:
         logger.error(f"Unexpected error during initial connection: {e}")
-        return jsonify({'success': False, 'message': f'An unexpected error occurred: {e}.'}), 500
+        return jsonify({'success': False, 'message': _('An unexpected error occurred: {error}').format(error=str(e))}), 500
 
 
 @app.route('/api/test-connection', methods=['POST'])
@@ -1228,7 +1237,62 @@ def update_config_route():
 
 
     config_loader.update_config(data)
-    return jsonify({'success': True, 'message': 'Configuration updated and saved.'})
+    return jsonify({'success': True, 'message': _('Configuration updated and saved.')})
+
+@app.route('/api/admin/change-password', methods=['POST'])
+@login_required
+def change_admin_password():
+    global app_config # Ensuring this is the very first line
+    data = request.json
+    current_password = data.get('current_password')
+    new_password = data.get('new_password')
+
+    if not current_password or not new_password:
+        return jsonify({'success': False, 'message': _('Current password and new password are required.')}), 400
+
+    if not isinstance(current_password, str) or not isinstance(new_password, str):
+        return jsonify({'success': False, 'message': _('Passwords must be strings.')}), 400
+
+    # Basic new password length validation (can be made more complex)
+    if len(new_password) < 8:
+        return jsonify({'success': False, 'message': _('New password must be at least 8 characters long.')}), 400
+
+    admin_username = app_config.get('app_admin', {}).get('username')
+    current_password_hash = app_config.get('app_admin', {}).get('password_hash')
+
+    if not current_user.is_authenticated or current_user.id != admin_username:
+        # This should ideally be caught by @login_required and ensuring current_user is the admin,
+        # but an explicit check adds a layer of safety.
+        return jsonify({'success': False, 'message': _('Unauthorized.')}), 403
+
+    if not check_password_hash(current_password_hash, current_password):
+        return jsonify({'success': False, 'message': _('Incorrect current password.')}), 400
+
+    # Generate new password hash
+    new_password_hashed = generate_password_hash(new_password)
+
+    # Update in-memory config
+    # Ensure app_admin section exists
+    if 'app_admin' not in config_loader.config:
+        config_loader.config['app_admin'] = {} # Should not happen if defaults are loaded
+
+    config_loader.config['app_admin']['password_hash'] = new_password_hashed
+
+    # Save to config.json
+    try:
+        with open(config_loader.config_file, 'w') as f:
+            json.dump(config_loader.config, f, indent=4)
+        # Reload app_config globally after successful save
+        global app_config
+        app_config = config_loader.get_config()
+        logger.info(f"Admin password changed successfully for user '{admin_username}'.")
+        return jsonify({'success': True, 'message': _('Admin password changed successfully.')})
+    except Exception as e:
+        logger.error(f"Failed to save updated config file after password change: {e}")
+        # Potentially revert in-memory change if save fails, though this is tricky
+        # For now, log error and return failure to user.
+        return jsonify({'success': False, 'message': _('Failed to save new password. Please try again.')}), 500
+
 
 @app.route('/api/dashboard-stats', methods=['GET'])
 @login_required
@@ -1251,30 +1315,121 @@ def create_user():
     data = request.json
     username = data.get('name')
     password = data.get('password')
-    if not username or not password:
-        return jsonify({'success': False, 'message': _('Username and password are required.')}), 400
+    profile = data.get('profile')
+    limit_uptime = data.get('limit-uptime')
+    limit_bytes_total_str = data.get('limit-bytes-total')
+
+    if not username or not isinstance(username, str) or not username.strip():
+        return jsonify({'success': False, 'message': _('Username is required and must be a non-empty string.')}), 400
+    if not password or not isinstance(password, str) or not password.strip():
+        return jsonify({'success': False, 'message': _('Password is required and must be a non-empty string.')}), 400
+    if profile is not None and (not isinstance(profile, str) or not profile.strip()): # Profile can be empty if not provided, but if provided, must be non-empty string
+        return jsonify({'success': False, 'message': _('Profile, if provided, must be a non-empty string.')}), 400
+    if limit_uptime is not None and not isinstance(limit_uptime, str):
+        return jsonify({'success': False, 'message': _('Time Limit, if provided, must be a string.')}), 400
+
+    user_data_payload = {'name': username.strip(), 'password': password} # Start with validated required fields
+    if profile: # Add profile only if it's a non-empty string
+        user_data_payload['profile'] = profile.strip()
+    if limit_uptime: # Add limit_uptime only if it's a non-empty string (actual content validated by Mikrotik)
+         user_data_payload['limit-uptime'] = limit_uptime
+
+    if limit_bytes_total_str is not None:
+        try:
+            # Ensure it's a number, but pass as string as Mikrotik might expect that for some fields
+            # Or convert to int if service layer expects int. For now, assume string if not empty.
+            # The service layer's create_hotspot_user uses valid_user_data = {k: v for k, v in user_data.items() if v is not None}
+            # So an empty string for limit-bytes-total might be stripped.
+            # For Hotspot, '0' means unlimited, non-zero is limit.
+            # Let's ensure it's a string that represents a number.
+            if not isinstance(limit_bytes_total_str, (str, int, float)): # Check if it's not already a number or string
+                 raise ValueError("Data limit must be a string or number.")
+            str_val = str(limit_bytes_total_str).strip()
+            if str_val: # Only add if non-empty after stripping
+                int(str_val) # Validate it can be an integer
+                user_data_payload['limit-bytes-total'] = str_val
+        except ValueError:
+            return jsonify({'success': False, 'message': _('Data Limit, if provided, must be a valid number.')}), 400
     
-    success, message = router_os_service.create_hotspot_user(data)
-    return jsonify({'success': success, 'message': message}) # Assuming router_os_service returns translated messages or they are generic
+    # Add other fields from data if they exist and are not None
+    # Example: comment - ensure it's a string if provided
+    comment = data.get('comment')
+    if comment is not None:
+        if not isinstance(comment, str):
+            return jsonify({'success': False, 'message': _('Comment, if provided, must be a string.')}), 400
+        user_data_payload['comment'] = comment # Can be empty string
+
+    # server field for Mikrotik - if provided, ensure string
+    server = data.get('server')
+    if server is not None:
+        if not isinstance(server, str) or not server.strip(): # Must be non-empty if provided
+            return jsonify({'success': False, 'message': _('Server, if provided, must be a non-empty string.')}), 400
+        user_data_payload['server'] = server.strip()
+
+    success, message = router_os_service.create_hotspot_user(user_data_payload)
+    return jsonify({'success': success, 'message': message})
 
 @app.route('/api/bulk-create-users', methods=['POST'])
 @login_required
 def bulk_create_users():
     data = request.json
-    number_of_users = data.get('number_of_users')
+
+    try:
+        number_of_users = int(data.get('number_of_users'))
+        if number_of_users <= 0:
+            return jsonify({'success': False, 'message': _('Number of users must be a positive integer.')}), 400
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': _('Number of users must be a valid integer.')}), 400
+
     profile = data.get('profile')
-    username_length = int(data.get('username_length', 6))
-    password_length = int(data.get('password_length', 8))
+    if not profile or not isinstance(profile, str) or not profile.strip():
+        return jsonify({'success': False, 'message': _('Profile is required and must be a non-empty string.')}), 400
+
+    try:
+        username_length = int(data.get('username_length', 6))
+        if username_length <= 0:
+            return jsonify({'success': False, 'message': _('Username length must be a positive integer.')}), 400
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': _('Username length must be a valid integer.')}), 400
+
+    try:
+        password_length = int(data.get('password_length', 8))
+        if password_length <= 0:
+            return jsonify({'success': False, 'message': _('Password length must be a positive integer.')}), 400
+    except (ValueError, TypeError):
+        return jsonify({'success': False, 'message': _('Password length must be a valid integer.')}), 400
 
     username_prefix = data.get('username_prefix', '')
-    username_charset_key = data.get('username_charset', 'alphanumeric')
-    password_charset_key = data.get('password_charset', 'alphanumeric_symbols')
-    comment_for_batch = data.get('comment_prefix', '')
+    if not isinstance(username_prefix, str):
+        return jsonify({'success': False, 'message': _('Username prefix must be a string.')}), 400
 
-    if not all([number_of_users, profile]):
-        return jsonify({'success': False, 'message': _('Number of users and profile are required.')}), 400
-    if int(number_of_users) <= 0:
-        return jsonify({'success': False, 'message': _('Number of users must be positive.')}), 400
+    username_charset_key = data.get('username_charset', 'alphanumeric')
+    if not isinstance(username_charset_key, str):
+        return jsonify({'success': False, 'message': _('Username charset key must be a string.')}), 400
+
+    password_charset_key = data.get('password_charset', 'alphanumeric_symbols')
+    if not isinstance(password_charset_key, str):
+        return jsonify({'success': False, 'message': _('Password charset key must be a string.')}), 400
+
+    comment_for_batch = data.get('comment_prefix', '') # 'comment_prefix' from JS is used as 'comment' for users
+    if not isinstance(comment_for_batch, str):
+        return jsonify({'success': False, 'message': _('Batch Name / Comment Prefix must be a string.')}), 400
+
+    # Validate optional limit fields if present
+    limit_uptime = data.get('limit-uptime')
+    if limit_uptime is not None and not isinstance(limit_uptime, str):
+        return jsonify({'success': False, 'message': _('Time Limit, if provided, must be a string.')}), 400
+
+    limit_bytes_total_str = data.get('limit-bytes-total')
+    if limit_bytes_total_str is not None:
+        try:
+            if not isinstance(limit_bytes_total_str, (str, int, float)):
+                raise ValueError("Data limit must be a string or number.")
+            str_val = str(limit_bytes_total_str).strip()
+            if str_val: # Only process if non-empty after stripping
+                int(str_val) # Validate it can be an integer
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'message': _('Data Limit, if provided, must be a valid number.')}), 400
 
     # Define character sets
     safe_symbols = '!@#$%^&*-=+'
@@ -1332,10 +1487,70 @@ def bulk_create_users():
 @login_required
 def edit_user(username: str):
     data = request.json
-    if 'disabled' in data:
-        data['disabled'] = 'true' if data['disabled'] else 'false'
 
-    success, message = router_os_service.edit_hotspot_user(username, data)
+    # Validate username from URL param (should always be a string from Flask routing)
+    if not username or not isinstance(username, str):
+         # This case should ideally not be hit if Flask routing is working as expected
+        return jsonify({'success': False, 'message': _('Invalid username in URL.')}), 400
+
+    payload_to_service = {}
+
+    # Validate password if provided
+    password = data.get('password')
+    if password is not None: # Allow empty string for password to effectively not change it if service layer handles empty string appropriately
+        if not isinstance(password, str):
+            return jsonify({'success': False, 'message': _('Password, if provided, must be a string.')}), 400
+        if password.strip(): # Only add to payload if non-empty after stripping
+            payload_to_service['password'] = password
+        # If password is an empty string (or whitespace only), it's omitted from payload, meaning "no change"
+
+    # Validate profile if provided
+    profile = data.get('profile')
+    if profile is not None:
+        if not isinstance(profile, str) or not profile.strip():
+            return jsonify({'success': False, 'message': _('Profile, if provided, must be a non-empty string.')}), 400
+        payload_to_service['profile'] = profile.strip()
+
+    # Validate limit-uptime if provided
+    limit_uptime = data.get('limit-uptime')
+    if limit_uptime is not None:
+        if not isinstance(limit_uptime, str): # Can be empty string to clear the limit
+            return jsonify({'success': False, 'message': _('Time Limit, if provided, must be a string.')}), 400
+        payload_to_service['limit-uptime'] = limit_uptime
+
+    # Validate limit-bytes-total if provided
+    limit_bytes_total_str = data.get('limit-bytes-total')
+    if limit_bytes_total_str is not None:
+        try:
+            if not isinstance(limit_bytes_total_str, (str, int, float)):
+                 raise ValueError("Data limit must be a string or number.")
+            str_val = str(limit_bytes_total_str).strip()
+            # Allow empty string to clear the limit, or '0' for unlimited, or a number
+            if str_val:
+                int(str_val) # Validate it can be an integer if not empty
+                payload_to_service['limit-bytes-total'] = str_val
+            else: # If it's an empty string after strip, means user wants to clear it
+                payload_to_service['limit-bytes-total'] = ""
+        except (ValueError, TypeError):
+            return jsonify({'success': False, 'message': _('Data Limit, if provided, must be a valid number or empty to clear.')}), 400
+
+    # Validate comment if provided
+    comment = data.get('comment')
+    if comment is not None:
+        if not isinstance(comment, str):
+            return jsonify({'success': False, 'message': _('Comment, if provided, must be a string.')}), 400
+        payload_to_service['comment'] = comment # Allow empty string
+
+    # Validate disabled status
+    if 'disabled' in data:
+        if not isinstance(data['disabled'], bool):
+            return jsonify({'success': False, 'message': _('Disabled status must be a boolean (true/false).')}), 400
+        payload_to_service['disabled'] = 'true' if data['disabled'] else 'false'
+
+    if not payload_to_service: # Check if anything is actually being changed
+        return jsonify({'success': False, 'message': _('No valid data provided for update.')}), 400
+
+    success, message = router_os_service.edit_hotspot_user(username, payload_to_service)
     return jsonify({'success': success, 'message': message})
 
 @app.route('/api/users/<username>', methods=['DELETE'])
@@ -1408,18 +1623,81 @@ def get_profiles_route():
 @login_required
 def create_profile_route():
     data = request.json
-    if not data.get('name'):
-        return jsonify({'success': False, 'message': _('Profile name is required.')}), 400
-    success, message = router_os_service.create_hotspot_profile(data)
+    name = data.get('name')
+
+    if not name or not isinstance(name, str) or not name.strip():
+        return jsonify({'success': False, 'message': _('Profile name is required and must be a non-empty string.')}), 400
+
+    payload_to_service = {'name': name.strip()}
+
+    # Optional fields: ensure they are strings if provided
+    # Mikrotik generally accepts string representations for these, even for numbers/timeouts
+    optional_fields = ['rate-limit', 'session-timeout', 'shared-users',
+                       'mac-cookie-timeout', 'keepalive-timeout',
+                       'on-login', 'on-logout', 'parent-queue'] # Add other relevant fields
+
+    for field in optional_fields:
+        value = data.get(field)
+        if value is not None: # Field is present in the request
+            if not isinstance(value, str):
+                return jsonify({'success': False, 'message': _('Field "{0}" must be a string if provided.').format(field)}), 400
+            # Add to payload only if it's a non-empty string after stripping, or allow empty if Mikrotik field semantics permit
+            # For simplicity here, we'll pass it along if it's a string. Mikrotik will validate content.
+            # If specific fields must be non-empty if provided, add that check.
+            payload_to_service[field] = value
+            # Example: if 'rate-limit' must be non-empty if key exists:
+            # if field == 'rate-limit' and not value.strip():
+            #    return jsonify({'success': False, 'message': _('Rate Limit cannot be an empty string if provided.')}), 400
+
+
+    success, message = router_os_service.create_hotspot_profile(payload_to_service)
     return jsonify({'success': success, 'message': message})
 
 @app.route('/api/profiles/<profile_id>', methods=['PUT'])
 @login_required
 def edit_profile_route(profile_id: str):
     data = request.json
-    if not data:
+    if not data: # Ensure data is not empty
         return jsonify({'success': False, 'message': _('No data provided for update.')}), 400
-    success, message = router_os_service.edit_hotspot_profile(profile_id, data)
+
+    # profile_id from URL is already validated by Flask's routing to be a string.
+    # We should ensure it's not empty if that's a possibility, though typically Flask routes would require it.
+    if not profile_id or not profile_id.strip():
+         return jsonify({'success': False, 'message': _('Profile ID in URL cannot be empty.')}), 400
+
+    payload_to_service = {}
+
+    # Name can be part of the editable fields in the payload for some systems,
+    # but for Mikrotik, profile name is often the identifier and might not be changeable directly via 'set'.
+    # Assuming 'name' in payload means new name, which might not be supported or require different handling.
+    # For this example, let's assume 'name' in payload is NOT for changing the ID, but other attributes.
+    # If 'name' itself is being changed, the service layer would need to handle that (e.g. remove and re-add or specific command).
+    # The current RouterOSService().edit_hotspot_profile just passes all **new_data.
+    # Let's validate provided fields similar to create_profile_route.
+
+    name_in_payload = data.get('name')
+    if name_in_payload is not None: # If user is trying to send 'name' in payload
+        if not isinstance(name_in_payload, str) or not name_in_payload.strip():
+            return jsonify({'success': False, 'message': _('Profile name in payload, if provided, must be a non-empty string.')}), 400
+        # If name in payload is different from profile_id, it implies an attempt to change the name.
+        # This example will update the name if provided.
+        payload_to_service['name'] = name_in_payload.strip()
+
+    optional_fields = ['rate-limit', 'session-timeout', 'shared-users',
+                       'mac-cookie-timeout', 'keepalive-timeout',
+                       'on-login', 'on-logout', 'parent-queue']
+
+    for field in optional_fields:
+        value = data.get(field)
+        if value is not None: # Field is present in the request
+            if not isinstance(value, str):
+                return jsonify({'success': False, 'message': _('Field "{0}" must be a string if provided.').format(field)}), 400
+            payload_to_service[field] = value
+
+    if not payload_to_service:
+         return jsonify({'success': False, 'message': _('No valid fields provided for update.')}), 400
+
+    success, message = router_os_service.edit_hotspot_profile(profile_id, payload_to_service)
     return jsonify({'success': success, 'message': message})
 
 @app.route('/api/profiles/<profile_id>', methods=['DELETE'])
@@ -1592,6 +1870,29 @@ def get_translations():
         'Profile "{0}" deleted.': _('Profile "{0}" deleted.'),
         'HTTP error! status: {0}': _('HTTP error! status: {0}'),
         'Connection failed (Error {0}). Please check details and try again.': _('Connection failed (Error {0}). Please check details and try again.'),
+        'Connecting...': _('Connecting...'),
+        'Connected': _('Connected'),
+        'Disconnected': _('Disconnected'),
+        'Total Data Transferred: {0}': _('Total Data Transferred: {0}'),
+        'Error Loading Chart': _('Error Loading Chart'),
+        'Connection successful!': _('Connection successful!'),
+        'Unknown error.': _('Unknown error.'),
+        # 'Connection failed: {0}' might be similar to 'Connection failed (Error {0}) ...' - ensure distinct if needed or reuse. Let's assume it's for a slightly different context.
+        'Connection failed: {0}': _('Connection failed: {0}'),
+        'Failed to connect to the router. Please check your settings.': _('Failed to connect to the router. Please check your settings.'),
+        'Export initiated. Your download should begin shortly or open in a new tab.': _('Export initiated. Your download should begin shortly or open in a new tab.'),
+
+        # Admin password change
+        'Current password and new password are required.': _('Current password and new password are required.'),
+        'New passwords do not match.': _('New passwords do not match.'),
+        'An unexpected error occurred while changing the password.': _('An unexpected error occurred while changing the password.'),
+        'Admin password changed successfully. Consider logging out and back in.': _('Admin password changed successfully. Consider logging out and back in.'),
+        'Passwords must be strings.': _('Passwords must be strings.'),
+        'New password must be at least 8 characters long.': _('New password must be at least 8 characters long.'),
+        'Unauthorized.': _('Unauthorized.'),
+        'Incorrect current password.': _('Incorrect current password.'),
+        'Admin password changed successfully.': _('Admin password changed successfully.'),
+        'Failed to save new password. Please try again.': _('Failed to save new password. Please try again.'),
 
         # New keys for delete features
         'Delete Users by Profile': _('Delete Users by Profile'), # Title and button text
