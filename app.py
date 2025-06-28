@@ -1035,6 +1035,79 @@ class RouterOSService:
             
         return True, message, deleted_count
 
+    def get_router_health(self) -> dict:
+        """Fetches router health and system information."""
+        health_info = {
+            'cpu_load': None,
+            'free_memory': None,
+            'total_memory': None,
+            'uptime': None,
+            'version': None,
+            'model': None,
+            'routerboard_firmware': None,
+            'error': None
+        }
+        try:
+            api = get_mikrotik_api()
+            if api is None:
+                health_info['error'] = "Mikrotik API not available."
+                return health_info
+
+            # Fetch system resources
+            resource_path = api.path('system', 'resource')
+            resources = list(resource_path)
+            if resources:
+                res = resources[0]
+                health_info['cpu_load'] = res.get('cpu-load')
+                health_info['free_memory'] = res.get('free-memory')
+                health_info['total_memory'] = res.get('total-memory')
+                health_info['uptime'] = res.get('uptime')
+                health_info['version'] = res.get('version')
+            else:
+                logger.warning("Could not fetch system resources.")
+                health_info['error'] = (health_info['error'] or "") + " Could not fetch system resources."
+
+
+            # Fetch routerboard info
+            routerboard_path = api.path('system', 'routerboard')
+            routerboards = list(routerboard_path.select('model', 'current-firmware')) # Specify fields
+            if routerboards: # Some devices might not have 'routerboard' (e.g. CHR)
+                rb = routerboards[0]
+                health_info['model'] = rb.get('model')
+                health_info['routerboard_firmware'] = rb.get('current-firmware')
+            else:
+                # Attempt to get model from /system/identity if not on routerboard
+                if not health_info['model']:
+                    identity_info = list(api.path('system', 'identity').select('name'))
+                    if identity_info: # This gets router name, not model, but better than nothing
+                         # Actually, /system/resource has 'board-name' which is often the model for CHR/VMs
+                        if resources and resources[0].get('board-name'):
+                            health_info['model'] = resources[0].get('board-name')
+                        else: # Fallback if board-name is also not there
+                            health_info['model'] = "N/A"
+                logger.info("Routerboard info not available or device is not a physical RouterBOARD.")
+
+
+            # Clean up error message if partially successful
+            if health_info['cpu_load'] is not None and health_info['error'] is not None: # if some data was fetched
+                if "Could not fetch system resources." in health_info['error'] and health_info['version']:
+                    # If version (from resources) was fetched, then resource fetch wasn't a total failure.
+                    # This logic might need refinement based on what's critical.
+                    pass # Error message might still be relevant if only some resource fields failed.
+
+            if not health_info['error']: # If error is None, set it to empty string for consistency if needed by frontend
+                health_info['error'] = ''
+
+
+        except (TrapError, librouteros.exceptions.LibRouterosError, socket.error) as e:
+            logger.error(f"Error fetching router health: {str(e)}")
+            health_info['error'] = f"Mikrotik API Error: {str(e)}"
+        except Exception as e:
+            logger.error(f"Unexpected error fetching router health: {str(e)}")
+            health_info['error'] = f"Unexpected error: {str(e)}"
+
+        return health_info
+
 router_os_service = RouterOSService()
 
 # --- Helper Functions ---
@@ -1509,6 +1582,20 @@ def get_basic_analytics_summary_route():
     except Exception as e:
         logger.error(f"API: Error fetching basic analytics: {str(e)}")
         return jsonify({'success': False, 'message': _('A server error occurred while fetching analytics: {error}').format(error=str(e))}), 500
+
+@app.route('/api/router-health', methods=['GET'])
+@login_required
+def get_router_health_route():
+    """API endpoint to get router health information."""
+    try:
+        health_data = router_os_service.get_router_health()
+        if health_data.get('error') and not health_data.get('version'): # Check if it's a significant error
+            # If there's an error message and we couldn't even get basic info like version
+            return jsonify({'success': False, 'message': health_data['error'], 'data': health_data}), 503 # Service Unavailable
+        return jsonify({'success': True, 'data': health_data})
+    except Exception as e:
+        logger.error(f"API: Error fetching router health: {str(e)}")
+        return jsonify({'success': False, 'message': _('A server error occurred while fetching router health: {error}').format(error=str(e))}), 500
 
 @app.route('/api/translations')
 # This route is called by login.html, so it should be accessible without app login.

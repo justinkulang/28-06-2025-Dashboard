@@ -647,6 +647,41 @@
                         <p>Active Sessions</p>
                     </div>
                 </div>
+                 <div class="stat-card" id="uptimeCard">
+                    <i class="fas fa-clock stat-card-icon" style="color: var(--info-color);"></i>
+                    <div class="stat-card-info">
+                        <h3 id="routerUptime">-</h3>
+                        <p>Router Uptime</p>
+                    </div>
+                </div>
+                <div class="stat-card" id="versionCard">
+                    <i class="fas fa-code-branch stat-card-icon" style="color: #6c757d;"></i>
+                    <div class="stat-card-info">
+                        <h3 id="routerVersion" style="font-size: 1.2rem;">-</h3>
+                        <p>OS Version</p>
+                    </div>
+                </div>
+                <div class="stat-card" id="cpuLoadCard">
+                    <i class="fas fa-microchip stat-card-icon" style="color: var(--warning-color);"></i>
+                    <div class="stat-card-info">
+                        <h3 id="routerCpuLoad">- %</h3>
+                        <p>CPU Load</p>
+                    </div>
+                </div>
+                <div class="stat-card" id="memoryUsageCard">
+                    <i class="fas fa-memory stat-card-icon" style="color: #17a2b8;"></i>
+                    <div class="stat-card-info">
+                        <h3 id="routerMemoryUsage" style="font-size: 1.1rem;">- / -</h3>
+                        <p>Memory Usage</p>
+                    </div>
+                </div>
+                <div class="stat-card" id="modelCard" style="grid-column: span 2;">
+                    <i class="fas fa-server stat-card-icon" style="color: #343a40;"></i>
+                    <div class="stat-card-info">
+                        <h3 id="routerModel" style="font-size: 1.2rem;">-</h3>
+                        <p>Router Model & Firmware</p>
+                    </div>
+                </div>
             </div>
             <div class="panel">
                 <p>Welcome to The IT Dad's Hotspot Management System. Use the menu on the left to navigate.</p>
@@ -1189,11 +1224,13 @@ async function init() {
     await loadActiveSessions();
     await loadConfig();
     setupDeleteByStatusDropdown(); // Populate #deleteByStatusSelect with translated options
+    await loadRouterHealth(); // Load router health on initial load
     
     // Auto-refresh data every 60 seconds
     setInterval(() => {
         if (document.getElementById('dashboard').classList.contains('active')) {
              loadDashboardStats();
+             loadRouterHealth(); // Also refresh router health when dashboard is active
         }
         if (document.getElementById('users').classList.contains('active')) {
              loadUsers(true); // silent refresh
@@ -1385,6 +1422,13 @@ function updateUIAfterConnectionCheck(isConnected, isInitialLoad = false) {
     if (!isConnected && isInitialLoad) {
         document.getElementById('totalUsers').textContent = '-';
         document.getElementById('activeSessions').textContent = '-';
+        // Clear router health fields
+        document.getElementById('routerUptime').textContent = '-';
+        document.getElementById('routerVersion').textContent = '-';
+        document.getElementById('routerCpuLoad').textContent = '- %';
+        document.getElementById('routerMemoryUsage').textContent = '- / -';
+        document.getElementById('routerModel').textContent = '-';
+
         document.querySelector('#usersTable tbody').innerHTML = `<tr><td colspan="9" style="text-align:center;">${getTranslation('Not connected to Mikrotik router.')}</td></tr>`;
         document.querySelector('#sessionsTable tbody').innerHTML = `<tr><td colspan="7" style="text-align:center;">${getTranslation('Not connected to Mikrotik router.')}</td></tr>`;
         document.querySelector('#profilesTable tbody').innerHTML = `<tr><td colspan="5" style="text-align:center;">${getTranslation('Not connected to Mikrotik router.')}</td></tr>`;
@@ -1396,12 +1440,61 @@ function updateUIAfterConnectionCheck(isConnected, isInitialLoad = false) {
          // Analytics specific message
         const profileCtx = document.getElementById('profileUsageChart').getContext('2d');
         const topUsersCtx = document.getElementById('topUsersChart').getContext('2d');
-        profileCtx.clearRect(0,0,profileCtx.canvas.width, profileCtx.canvas.height); // Clear canvas
-        topUsersCtx.clearRect(0,0,topUsersCtx.canvas.width, topUsersCtx.canvas.height); // Clear canvas
+        if (profileCtx) profileCtx.clearRect(0,0,profileCtx.canvas.width, profileCtx.canvas.height); // Clear canvas
+        if (topUsersCtx) topUsersCtx.clearRect(0,0,topUsersCtx.canvas.width, topUsersCtx.canvas.height); // Clear canvas
         // Optionally, draw a "Not Connected" message on canvas
     }
 }
 
+
+async function loadRouterHealth() {
+    const isConnected = document.querySelector('#connectionStatus').classList.contains('connected');
+    if (!isConnected) {
+        // Optionally, clear fields or show 'Not Connected' in health fields if desired
+        // This is already handled by updateUIAfterConnectionCheck on initial load if not connected.
+        // For periodic refresh, if connection drops, we might want to clear them.
+        document.getElementById('routerUptime').textContent = getTranslation('N/A');
+        document.getElementById('routerVersion').textContent = getTranslation('N/A');
+        document.getElementById('routerCpuLoad').textContent = getTranslation('N/A');
+        document.getElementById('routerMemoryUsage').textContent = getTranslation('N/A');
+        document.getElementById('routerModel').textContent = getTranslation('N/A');
+        return;
+    }
+
+    const result = await apiCall('/router-health');
+    if (result && result.success && result.data) {
+        const data = result.data;
+        document.getElementById('routerUptime').textContent = data.uptime || getTranslation('N/A');
+        document.getElementById('routerVersion').textContent = data.version || getTranslation('N/A');
+        document.getElementById('routerCpuLoad').textContent = data.cpu_load !== null ? `${data.cpu_load} %` : getTranslation('N/A');
+
+        if (data.free_memory !== null && data.total_memory !== null) {
+            const freeMemMB = (data.free_memory / (1024 * 1024)).toFixed(1);
+            const totalMemMB = (data.total_memory / (1024 * 1024)).toFixed(1);
+            document.getElementById('routerMemoryUsage').textContent = `${freeMemMB}MB / ${totalMemMB}MB`;
+        } else {
+            document.getElementById('routerMemoryUsage').textContent = getTranslation('N/A');
+        }
+
+        let modelFirmware = data.model || getTranslation('N/A');
+        if (data.routerboard_firmware) {
+            modelFirmware += ` (FW: ${data.routerboard_firmware})`;
+        }
+        document.getElementById('routerModel').textContent = modelFirmware;
+
+    } else {
+        // Handle error or no data - display N/A or error message
+        document.getElementById('routerUptime').textContent = getTranslation('Error');
+        document.getElementById('routerVersion').textContent = getTranslation('Error');
+        document.getElementById('routerCpuLoad').textContent = getTranslation('Error');
+        document.getElementById('routerMemoryUsage').textContent = getTranslation('Error');
+        document.getElementById('routerModel').textContent = getTranslation('Error fetching data');
+        if (result && result.message) {
+             // Optionally, show a more specific error in one of the fields or a global alert
+            logger.error("Error loading router health:", result.message);
+        }
+    }
+}
 
 async function loadDashboardStats() {
     const data = await apiCall('/dashboard-stats');
