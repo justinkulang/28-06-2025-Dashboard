@@ -276,12 +276,10 @@ function filterAndDisplayUsers() {
         const editButton = row.querySelector('.edit-user-btn');
         if (editButton) {
             editButton.onclick = () => openEditUserModal(user);
-            editButton.setAttribute('aria-label', getTranslation('Edit User: {0}', user.username));
         }
         const deleteButton = row.querySelector('.delete-user-btn');
         if (deleteButton) {
             deleteButton.onclick = () => deleteUser(user.username);
-            deleteButton.setAttribute('aria-label', getTranslation('Delete User: {0}', user.username));
         }
     });
     // Update total user count for dashboard
@@ -372,9 +370,7 @@ async function loadAnalyticsData() {
 
         // Data Usage by Profile
         const profileUsageTableBody = document.getElementById('analyticsProfileUsageTable').querySelector('tbody');
-        const profileUsageChartEmptyState = document.getElementById('profileUsageChartEmptyState'); // Get empty state div
         if (analytics.profile_usage && Object.keys(analytics.profile_usage).length > 0) {
-            if (profileUsageChartEmptyState) profileUsageChartEmptyState.style.display = 'none'; // Hide empty state
             const sortedProfiles = Object.entries(analytics.profile_usage).sort(([, a], [, b]) => b - a); // Sort by total usage descending
             populateTableFromTemplate('analyticsProfileUsageTable', 'profileUsageAnalyticsRowTemplate', sortedProfiles, (row, [profileName, totalUsage]) => {
                 row.querySelector('[data-field="profileName"]').textContent = profileName;
@@ -382,37 +378,11 @@ async function loadAnalyticsData() {
             });
         } else {
             profileUsageTableBody.innerHTML = `<tr><td colspan="2" style="text-align:center;">No profile usage data available.</td></tr>`;
-            if (profileUsageChartEmptyState) profileUsageChartEmptyState.style.display = 'flex'; // Show empty state
         }
-
-        // Similar logic for top users chart empty state (assuming it exists in HTML: id="topUsersChartEmptyState")
-        const topUsersChartEmptyState = document.getElementById('topUsersChartEmptyState');
-        if (analytics.top_users && analytics.top_users.length > 0) {
-            if (topUsersChartEmptyState) topUsersChartEmptyState.style.display = 'none';
-        } else {
-            if (topUsersChartEmptyState) topUsersChartEmptyState.style.display = 'flex';
-        }
-
     } catch (error) {
         logger.error("Failed to load analytics data:", error);
         showToast('danger', 'Failed to load analytics data.');
         document.getElementById('analyticsTotalData').textContent = 'Total Data Transferred: Error loading data';
-
-        // Show empty states for charts on error
-        const profileUsageChartEmptyState = document.getElementById('profileUsageChartEmptyState');
-        if (profileUsageChartEmptyState) {
-            profileUsageChartEmptyState.querySelector('h5').textContent = 'Error Loading Chart';
-            profileUsageChartEmptyState.querySelector('p').textContent = 'Could not load profile usage data.';
-            profileUsageChartEmptyState.style.display = 'flex';
-        }
-        const topUsersChartEmptyState = document.getElementById('topUsersChartEmptyState');
-        if (topUsersChartEmptyState) {
-            topUsersChartEmptyState.querySelector('h5').textContent = 'Error Loading Chart';
-            topUsersChartEmptyState.querySelector('p').textContent = 'Could not load top users data.';
-            topUsersChartEmptyState.style.display = 'flex';
-        }
-
-        // Also update table empty states on error
         document.getElementById('analyticsTopUsersTable').querySelector('tbody').innerHTML = `<tr><td colspan="7" style="text-align:center;">Could not load top user data.</td></tr>`;
         document.getElementById('analyticsProfileUsageTable').querySelector('tbody').innerHTML = `<tr><td colspan="2" style="text-align:center;">Could not load profile usage data.</td></tr>`;
     } finally {
@@ -464,7 +434,6 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Setup form submissions
     document.getElementById('configForm').addEventListener('submit', handleConfigSave);
-    document.getElementById('changePasswordForm').addEventListener('submit', handleChangePassword); // Added this line
     document.getElementById('createUserForm').addEventListener('submit', handleCreateUser);
     document.getElementById('bulkCreateUserForm').addEventListener('submit', handleBulkCreateUsers);
     document.getElementById('editUserForm').addEventListener('submit', handleEditUser);
